@@ -52,6 +52,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: PlayerVariant_Mannequin
       objectReference: {fileID: 0}
+    - target: {fileID: 4357718914165031986, guid: 6dfa79fe57aadb24684e719178bdb9e3, type: 3}
+      propertyPath: m_TagString
+      value: Mannequin
+      objectReference: {fileID: 0}
     m_RemovedComponents:
     - {fileID: 5310487935734176966, guid: 6dfa79fe57aadb24684e719178bdb9e3, type: 3}
     - {fileID: 5369923202161218156, guid: 6dfa79fe57aadb24684e719178bdb9e3, type: 3}

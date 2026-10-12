@@ -6,8 +6,11 @@ using UnityEngine;
 /// 씬 전체 데칼 점멸 타이밍을 하나로 관리. 등록된 모든 DecalBlink가 동시에 점멸한다.
 /// 씬에 하나만 배치.
 /// </summary>
+[DefaultExecutionOrder(-100)]
 public class DecalBlinkManager : MonoBehaviour
 {
+    
+
     public static DecalBlinkManager Instance { get; private set; }
 
     [Header("점멸 간격 (초)")]
