@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 라운드 시작 시 마네킹 배치
@@ -48,9 +47,6 @@ public class MannequinSpawner : MonoBehaviour
     [Tooltip("비워두면 Tag가 Player인 오브젝트 위치 사용")]
     [SerializeField] private Transform[] playerSpawns;
 
-    [Header("디버그 (3키: 발사 위치 기록 / 4키: 라운드 넘기고 재배치)")]
-    [SerializeField] private bool debugKeys = true;
-
     private readonly List<GameObject> spawned = new List<GameObject>();
     private readonly List<Vector3> usedPositions = new List<Vector3>();
     private List<ShotRecord> previousShots = new List<ShotRecord>();
@@ -68,34 +64,6 @@ public class MannequinSpawner : MonoBehaviour
     {
         BuildNavTriangles();
         if (spawnOnStart) SpawnForRound();
-    }
-
-    private void Update()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (!debugKeys) return;
-        var kb = Keyboard.current;
-        if (kb == null) return;
-
-        // 3키: 현재 플레이어 위치/방향을 "발사 위치"로 기록
-        if (kb.digit3Key.wasPressedThisFrame)
-        {
-            var p = GameObject.FindWithTag("Player");
-            if (p != null)
-            {
-                RecordShot(p.transform.position, p.transform.forward);
-                Debug.Log($"[MannequinSpawner] 발사 위치 기록 ({currentShots.Count}개)");
-            }
-        }
-
-        // 4키: 라운드 넘긴 것처럼 재배치
-        if (kb.digit4Key.wasPressedThisFrame)
-        {
-            EndRound();
-            SpawnForRound();
-            Debug.Log($"[MannequinSpawner] 재배치 (지난 라운드 발사 기록 {previousShots.Count}개 사용 가능)");
-        }
-#endif
     }
 
     // ───────── 라운드 연동용 (외부에서 호출) ─────────

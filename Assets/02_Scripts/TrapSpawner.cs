@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
-using UnityEngine.InputSystem;
 using UnityEngine.Rendering.Universal;
 
 /// <summary>
@@ -10,8 +9,7 @@ using UnityEngine.Rendering.Universal;
 ///  ② Reveal 트랩 (BlackSkull)  : 벽/바닥에 Min~Max개 랜덤 생성
 ///     - 벽: NavMesh 경계(벽 바로 앞)를 찾아 그 바깥쪽으로 Raycast → 회전된 컨테이너 벽도 자동 정렬
 ///     - 그림 네 귀퉁이까지 표면이 있는지 확인 → 끝에서 잘리지 않게
-///     - 플레이어 시작 위치 근처 제외
-///  디버그 8키: 모든 트랩 데칼 항상 표시 ON/OFF
+///     - 플레이어 시작 위치, 활성화된 맵 트랩 근처 제외
 /// Reveal 트랩 프리팹은 "루트 = 표면 위의 점, Z축 = 표면 안쪽" 구조여야 한다.
 /// </summary>
 public class TrapSpawner : MonoBehaviour
@@ -45,17 +43,16 @@ public class TrapSpawner : MonoBehaviour
     [Header("배치 제한")]
     [SerializeField] private float minDistanceBetween = 3f;
     [SerializeField] private float minDistanceFromPlayer = 6f;
+    [Tooltip("활성화된 맵 트랩(Bear, Lightning)과의 최소 거리")]
+    [SerializeField] private float minDistanceFromMapTrap = 5f;
     [Tooltip("비워두면 Tag가 Player인 오브젝트 위치 사용")]
     [SerializeField] private Transform[] playerSpawns;
     [SerializeField, Min(1)] private int maxAttemptsPerTrap = 60;
     [SerializeField] private bool spawnOnStart = true;
 
-    [Header("디버그")]
-    [Tooltip("8키로 모든 트랩 데칼 항상 표시 ON/OFF")]
-    [SerializeField] private bool debugKeys = true;
-
     private readonly List<TrapBase> revealPool = new List<TrapBase>();
     private readonly List<Vector3> usedPositions = new List<Vector3>();
+    private readonly List<Vector3> mapTrapPositions = new List<Vector3>();
     private Vector2 halfSize = new Vector2(0.75f, 0.8f);   // 그림 절반 크기 (프리팹 데칼에서 읽음)
 
     // NavMesh 삼각형 캐시
@@ -68,8 +65,6 @@ public class TrapSpawner : MonoBehaviour
 
     private void Awake()
     {
-        TrapBase.DebugShowAll = false;   // Play 시작 시 항상 꺼진 상태로
-
         if (revealPrefab == null) return;
 
         // 그림 크기를 프리팹 데칼에서 읽어 귀퉁이 검사에 사용
@@ -91,33 +86,17 @@ public class TrapSpawner : MonoBehaviour
         if (spawnOnStart) SpawnForRound();
     }
 
-    private void Update()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (!debugKeys) return;
-        var kb = Keyboard.current;
-        if (kb == null || !kb.digit8Key.wasPressedThisFrame) return;
-
-        TrapBase.DebugShowAll = !TrapBase.DebugShowAll;
-
-        foreach (var t in revealPool) if (t != null) t.RefreshIdle();
-        if (mapTrapCandidates != null)
-            foreach (var t in mapTrapCandidates) if (t != null) t.RefreshIdle();
-
-        Debug.Log($"[TrapSpawner] 트랩 데칼 항상 표시: {(TrapBase.DebugShowAll ? "ON" : "OFF")}");
-#endif
-    }
-
     // ───────── 라운드 ─────────
 
     public void SpawnForRound()
     {
-        SpawnMapTraps();
-        SpawnRevealTraps();
+        SpawnMapTraps();      // 맵 트랩을 먼저 켜고
+        SpawnRevealTraps();   // 그 위치를 피해서 Reveal 트랩 배치
     }
 
     private void SpawnMapTraps()
     {
+        mapTrapPositions.Clear();
         if (mapTrapCandidates == null) return;
 
         var list = new List<TrapBase>();
@@ -130,7 +109,11 @@ public class TrapSpawner : MonoBehaviour
         Shuffle(list);
 
         int n = Mathf.Min(Random.Range(mapTrapMin, mapTrapMax + 1), list.Count);
-        for (int i = 0; i < n; i++) list[i].gameObject.SetActive(true);
+        for (int i = 0; i < n; i++)
+        {
+            list[i].gameObject.SetActive(true);
+            mapTrapPositions.Add(list[i].transform.position);
+        }
     }
 
     private void SpawnRevealTraps()
@@ -160,7 +143,7 @@ public class TrapSpawner : MonoBehaviour
             usedPositions.Add(pos);
         }
 
-        Debug.Log($"[TrapSpawner] Reveal 트랩 {placed}/{want}개 배치 (벽 {onWall}, 바닥 {placed - onWall})", this);
+        Debug.Log($"[TrapSpawner] 맵 트랩 {mapTrapPositions.Count}개, Reveal 트랩 {placed}/{want}개 배치 (벽 {onWall}, 바닥 {placed - onWall})", this);
     }
 
     // ───────── 표면 찾기 ─────────
@@ -241,10 +224,17 @@ public class TrapSpawner : MonoBehaviour
 
     private bool IsValidPosition(Vector3 p)
     {
+        // 다른 Reveal 트랩과 거리
         float sq = minDistanceBetween * minDistanceBetween;
         foreach (var u in usedPositions)
             if ((u - p).sqrMagnitude < sq) return false;
 
+        // 활성화된 맵 트랩(Bear, Lightning)과 거리
+        float msq = minDistanceFromMapTrap * minDistanceFromMapTrap;
+        foreach (var m in mapTrapPositions)
+            if ((m - p).sqrMagnitude < msq) return false;
+
+        // 플레이어와 거리
         float psq = minDistanceFromPlayer * minDistanceFromPlayer;
         foreach (var pp in GetPlayerPositions())
             if ((pp - p).sqrMagnitude < psq) return false;

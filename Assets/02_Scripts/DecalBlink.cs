@@ -7,6 +7,8 @@ using UnityEngine.Rendering.Universal;
 ///  - 정기 점멸 : DecalBlinkManager가 모든 캐릭터에 같은 값을 보냄 (5~10초 간격)
 ///  - ForceFlash : 이 캐릭터만 "틱틱틱" 짧게 깜빡임 (트랩 등, 정기 점멸과 별개)
 ///  - ForceGlow  : 이 캐릭터만 일정 시간 계속 켜둠
+///  - 데칼 라이트 : 데칼과 함께 켜지는 약한 라이트 → 몸 실루엣이 살짝 보임
+///                  (라이트 Rendering Layers = Player 로 두면 몸만 비춤)
 /// </summary>
 public class DecalBlink : MonoBehaviour
 {
@@ -18,6 +20,14 @@ public class DecalBlink : MonoBehaviour
     [Header("표시 방식")]
     [SerializeField] private BlinkMode mode = BlinkMode.Toggle;
     [SerializeField, Range(0f, 1f)] private float toggleThreshold = 0.5f;
+
+    [Header("데칼 라이트 (선택)")]
+    [Tooltip("데칼 근처에 둔 Point Light들. 비워두면 라이트 없이 동작")]
+    [SerializeField] private Light[] glowLights;
+    [Tooltip("평소 밝기 (0 = 꺼짐, 아주 작은 값이면 항상 희미한 실루엣)")]
+    [SerializeField, Min(0f)] private float lightIdleIntensity = 0f;
+    [Tooltip("데칼이 켜졌을 때 밝기")]
+    [SerializeField, Min(0f)] private float lightGlowIntensity = 0.3f;
 
     private float sharedValue;          // 매니저가 보낸 정기 점멸 값
     private bool overriding;            // ForceFlash / ForceGlow 진행 중
@@ -48,6 +58,11 @@ public class DecalBlink : MonoBehaviour
             DecalBlinkManager.Instance.Unregister(this);
         StopOverride();
         SetGlow(0f);
+    }
+
+    private void OnValidate()
+    {
+        if (Application.isPlaying) SetGlow(IsGlowing ? 1f : 0f);   // Play 중 Inspector 조정 즉시 반영
     }
 
     // ───────── 정기 점멸 (매니저가 호출) ─────────
@@ -118,21 +133,37 @@ public class DecalBlink : MonoBehaviour
     private void SetGlow(float value)
     {
         IsGlowing = value > 0.001f;
-        if (decals == null) return;
 
-        foreach (var d in decals)
+        // 데칼
+        float shown = value;   // 라이트에도 같은 값 사용
+        if (decals != null)
         {
-            if (d == null) continue;
-            if (mode == BlinkMode.Fade)
+            foreach (var d in decals)
             {
-                if (!d.enabled) d.enabled = true;
-                d.fadeFactor = value;
+                if (d == null) continue;
+                if (mode == BlinkMode.Fade)
+                {
+                    if (!d.enabled) d.enabled = true;
+                    d.fadeFactor = value;
+                }
+                else
+                {
+                    bool on = value > toggleThreshold;
+                    d.fadeFactor = 1f;
+                    d.enabled = on;
+                    shown = on ? 1f : 0f;
+                }
             }
-            else
-            {
-                d.fadeFactor = 1f;
-                d.enabled = value > toggleThreshold;
-            }
+        }
+
+        // 라이트: 평소 밝기 ~ 켜졌을 때 밝기
+        if (glowLights == null) return;
+        float intensity = Mathf.Lerp(lightIdleIntensity, lightGlowIntensity, shown);
+        foreach (var l in glowLights)
+        {
+            if (l == null) continue;
+            l.intensity = intensity;
+            l.enabled = intensity > 0.001f;
         }
     }
 }

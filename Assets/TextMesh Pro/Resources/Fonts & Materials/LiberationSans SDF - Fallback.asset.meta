@@ -1,8 +1,15 @@
 fileFormatVersion: 2
 guid: 2e498d1c8094910479dc3e1b768306a4
 timeCreated: 1484171803
-licenseType: Pro
+licenseType: Store
 NativeFormatImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 46209
+  packageName: Tanks! | 3D Sample Project
+  packageVersion: 4.1
+  assetPath: Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset
+  uploadId: 1012748

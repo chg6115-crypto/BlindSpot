@@ -7,8 +7,8 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// 모든 디버그 기능을 한 곳에서 관리 (에디터 / Development Build 전용)
 ///  - 숫자 키로 실행, 0키로 메뉴 창 열기/닫기 (메뉴의 버튼을 눌러도 실행)
-///  - 각 시스템의 공개 함수를 호출하므로, 개별 스크립트의 디버그 키는 꺼둘 것
-/// DebugTools 오브젝트에 붙여서 사용. (DebugLightToggle 기능 포함 → 그 컴포넌트는 제거)
+///  - 각 시스템의 공개 함수를 호출하는 방식
+/// DebugTools 오브젝트에 붙여서 사용.
 /// </summary>
 public class DebugMenu : MonoBehaviour
 {
@@ -50,8 +50,8 @@ public class DebugMenu : MonoBehaviour
     private void Awake()
     {
         visible = showOnStart;
-        if (mannequinSpawner == null) mannequinSpawner = FindFirstObjectByType<MannequinSpawner>();
-        if (trapSpawner == null) trapSpawner = FindFirstObjectByType<TrapSpawner>();
+        if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
+        if (trapSpawner == null) trapSpawner = FindAnyObjectByType<TrapSpawner>();
 
         // 키 배정은 여기 한 곳에서 관리
         Add(Key.Digit1, "손전등", ToggleFlashlight, () => OnOff(flashlight != null && flashlight.enabled));
@@ -88,7 +88,7 @@ public class DebugMenu : MonoBehaviour
 
     private void Update()
     {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEBUG
         var kb = Keyboard.current;
         if (kb == null) return;
 
@@ -181,40 +181,37 @@ public class DebugMenu : MonoBehaviour
     private void ToggleTrapDecals()
     {
         TrapBase.DebugShowAll = !TrapBase.DebugShowAll;
-        foreach (var t in FindObjectsByType<TrapBase>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (var t in FindObjectsByType<TrapBase>(FindObjectsInactive.Include))
             t.RefreshIdle();
     }
 
     // ───────── 메뉴 창 ─────────
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
+#if UNITY_EDITOR || DEBUG
     private void OnGUI()
     {
         if (!visible) return;
         EnsureStyles();
 
-        float lineH = fontSize + 12;
-        Rect area = new Rect(16, 16, 460f, 60f + lineH * (entries.Count + 2));
-
-        GUI.Box(area, GUIContent.none, boxStyle);
-        GUILayout.BeginArea(new Rect(area.x + 12, area.y + 10, area.width - 24, area.height - 20));
+        // 영역은 넉넉하게 잡고, 박스(Vertical)가 내용 크기만큼만 그려지게
+        GUILayout.BeginArea(new Rect(16, 16, 460f, Screen.height - 32));
+        GUILayout.BeginVertical(boxStyle);
 
         GUILayout.Label("DEBUG MENU   [0] 닫기", titleStyle);
         GUILayout.Space(6);
 
         foreach (var e in entries)
         {
-            GUILayout.BeginHorizontal();
             string keyName = e.key.ToString().Replace("Digit", "");
             string state = e.state != null ? $"  <b>{e.state()}</b>" : "";
             if (GUILayout.Button($"[{keyName}]  {e.label}{state}", buttonStyle))
                 e.action?.Invoke();
-            GUILayout.EndHorizontal();
         }
 
         GUILayout.Space(6);
         GUILayout.Label($"FPS: {(1f / Mathf.Max(Time.unscaledDeltaTime, 0.0001f)):0}", labelStyle);
 
+        GUILayout.EndVertical();
         GUILayout.EndArea();
     }
 
@@ -226,8 +223,17 @@ public class DebugMenu : MonoBehaviour
         bg.SetPixel(0, 0, new Color(0f, 0f, 0f, 0.75f));
         bg.Apply();
 
-        boxStyle = new GUIStyle(GUI.skin.box) { normal = { background = bg } };
-        labelStyle = new GUIStyle(GUI.skin.label) { fontSize = fontSize, richText = true, normal = { textColor = Color.white } };
+        boxStyle = new GUIStyle(GUI.skin.box)
+        {
+            normal = { background = bg },
+            padding = new RectOffset(12, 12, 10, 10)
+        };
+        labelStyle = new GUIStyle(GUI.skin.label)
+        {
+            fontSize = fontSize,
+            richText = true,
+            normal = { textColor = Color.white }
+        };
         titleStyle = new GUIStyle(labelStyle)
         {
             fontSize = fontSize + 4,

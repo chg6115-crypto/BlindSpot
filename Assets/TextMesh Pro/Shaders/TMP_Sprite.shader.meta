@@ -7,3 +7,10 @@ ShaderImporter:
   userData: 
   assetBundleName: 
   assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 46209
+  packageName: Tanks! | 3D Sample Project
+  packageVersion: 4.1
+  assetPath: Assets/TextMesh Pro/Shaders/TMP_Sprite.shader
+  uploadId: 1012748

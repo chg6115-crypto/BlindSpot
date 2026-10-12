@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// 플레이어별 킬/데스 기록. 점수가 바뀌면 OnScoreChanged 이벤트를 보낸다.
@@ -27,10 +26,6 @@ public class ScoreManager : MonoBehaviour
 
     [Header("로컬 플레이어")]
     [SerializeField] private string localPlayerName = "PLAYER_01";
-
-    [Header("디버그 (5: 랜덤 킬 / 6: 내 데스 / 7: 초기화)")]
-    [SerializeField] private bool debugKeys = true;
-    [SerializeField, Min(0)] private int debugFakePlayers = 4;
 
     private readonly Dictionary<int, PlayerScore> scores = new Dictionary<int, PlayerScore>();
     private int nextId = 0;
@@ -95,44 +90,5 @@ public class ScoreManager : MonoBehaviour
             .ThenBy(s => s.deaths)
             .ThenBy(s => s.name)
             .ToList();
-    }
-
-    // ───────── 디버그 ─────────
-
-    private void Update()
-    {
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        if (!debugKeys) return;
-        var kb = Keyboard.current;
-        if (kb == null) return;
-
-        if (kb.digit5Key.wasPressedThisFrame)
-        {
-            EnsureFakePlayers();
-            var ids = scores.Keys.ToList();
-            int killer = ids[UnityEngine.Random.Range(0, ids.Count)];
-            int victim;
-            do { victim = ids[UnityEngine.Random.Range(0, ids.Count)]; } while (victim == killer && ids.Count > 1);
-            AddKill(killer, victim);
-        }
-
-        if (kb.digit6Key.wasPressedThisFrame)
-        {
-            EnsureFakePlayers();
-            var others = scores.Keys.Where(k => k != LocalPlayerId).ToList();
-            int killer = others.Count > 0 ? others[UnityEngine.Random.Range(0, others.Count)] : -1;
-            AddKill(killer, LocalPlayerId);
-        }
-
-        if (kb.digit7Key.wasPressedThisFrame)
-            ResetScores();
-#endif
-    }
-
-    private void EnsureFakePlayers()
-    {
-        int current = scores.Count - 1; // 로컬 제외
-        for (int i = current; i < debugFakePlayers; i++)
-            Register($"BOT_{i + 1:00}");
     }
 }
