@@ -9,10 +9,14 @@ using UnityEngine.Rendering.Universal;
 ///  - ForceGlow  : 이 캐릭터만 일정 시간 계속 켜둠
 ///  - 데칼 라이트 : 데칼과 함께 켜지는 약한 라이트 → 몸 실루엣이 살짝 보임
 ///                  (라이트 Rendering Layers = Player 로 두면 몸만 비춤)
+///  - DebugForceOn : 디버그용, 모든 캐릭터 데칼/라이트 항상 켜기 (DebugMenu 9키)
 /// </summary>
 public class DecalBlink : MonoBehaviour
 {
     public enum BlinkMode { Fade, Toggle }
+
+    /// <summary>디버그: 모든 캐릭터 데칼 항상 켜기 (DebugMenu에서 토글)</summary>
+    public static bool DebugForceOn;
 
     [Header("데칼 (얼굴, 등)")]
     [SerializeField] private DecalProjector[] decals;
@@ -30,6 +34,7 @@ public class DecalBlink : MonoBehaviour
     [SerializeField, Min(0f)] private float lightGlowIntensity = 0.3f;
 
     private float sharedValue;          // 매니저가 보낸 정기 점멸 값
+    private float currentValue;         // 현재 표시 중인 값 (디버그 해제 시 복귀용)
     private bool overriding;            // ForceFlash / ForceGlow 진행 중
     private Coroutine overrideRoutine;
 
@@ -62,7 +67,7 @@ public class DecalBlink : MonoBehaviour
 
     private void OnValidate()
     {
-        if (Application.isPlaying) SetGlow(IsGlowing ? 1f : 0f);   // Play 중 Inspector 조정 즉시 반영
+        if (Application.isPlaying) SetGlow(currentValue);   // Play 중 Inspector 조정 즉시 반영
     }
 
     // ───────── 정기 점멸 (매니저가 호출) ─────────
@@ -85,6 +90,12 @@ public class DecalBlink : MonoBehaviour
     public void ForceGlow(float duration)
     {
         StartOverride(HoldRoutine(duration));
+    }
+
+    /// <summary>디버그 스위치(DebugForceOn) 변경 후 즉시 반영</summary>
+    public void RefreshDebug()
+    {
+        SetGlow(currentValue);
     }
 
     private IEnumerator FlashRoutine(int count, float onTime, float offTime)
@@ -132,6 +143,9 @@ public class DecalBlink : MonoBehaviour
 
     private void SetGlow(float value)
     {
+        currentValue = value;
+        if (DebugForceOn) value = 1f;   // 디버그: 항상 켜기
+
         IsGlowing = value > 0.001f;
 
         // 데칼

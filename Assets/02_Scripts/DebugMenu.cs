@@ -62,6 +62,7 @@ public class DebugMenu : MonoBehaviour
         Add(Key.Digit6, "내 데스 +1", LocalDeath, null);
         Add(Key.Digit7, "점수 초기화", ResetScores, null);
         Add(Key.Digit8, "트랩 데칼 항상 표시", ToggleTrapDecals, () => OnOff(TrapBase.DebugShowAll));
+        Add(Key.Digit9, "캐릭터 데칼 항상 켜기", ToggleCharacterDecals, () => OnOff(DecalBlink.DebugForceOn));
     }
 
     private void Start()
@@ -70,6 +71,7 @@ public class DebugMenu : MonoBehaviour
         if (debugSun != null) debugSun.enabled = false;
         savedAmbient = RenderSettings.ambientLight;
         TrapBase.DebugShowAll = false;
+        DecalBlink.DebugForceOn = false;
     }
 
     private void OnDisable()
@@ -176,13 +178,20 @@ public class DebugMenu : MonoBehaviour
             if (sm.Register($"BOT_{i + 1:00}") < 0) break;   // 최대 인원이면 중단
     }
 
-    // ───────── 트랩 ─────────
+    // ───────── 트랩 / 데칼 ─────────
 
     private void ToggleTrapDecals()
     {
         TrapBase.DebugShowAll = !TrapBase.DebugShowAll;
         foreach (var t in FindObjectsByType<TrapBase>(FindObjectsInactive.Include))
             t.RefreshIdle();
+    }
+
+    private void ToggleCharacterDecals()
+    {
+        DecalBlink.DebugForceOn = !DecalBlink.DebugForceOn;
+        foreach (var d in FindObjectsByType<DecalBlink>(FindObjectsInactive.Include))
+            d.RefreshDebug();
     }
 
     // ───────── 메뉴 창 ─────────

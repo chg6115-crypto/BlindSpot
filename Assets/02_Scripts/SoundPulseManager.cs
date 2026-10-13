@@ -4,7 +4,8 @@ using UnityEngine;
 
 /// <summary>
 /// 소리 → 주변 외곽선 표시 관리. GameManager 아래에 하나만 배치.
-///  ① 펄스 (Emit)     : 총소리 등 한 번 퍼졌다 사라짐 (expand → hold → fade)
+///  ① 펄스 (Emit)     : 소나 스킬, 총소리 등 한 번 퍼졌다 사라짐 (expand → hold → fade)
+///                       시간을 따로 넘기면 그 값 사용, 안 넘기면 아래 기본값 사용
 ///  ② 필드 (SetField) : 이동 소리처럼 실시간으로 유지/추적 (위치·반경·밝기를 매 프레임 갱신)
 /// 셰이더(BlindSpot/SonarOutline)에 전역 배열로 전달. 필드 + 펄스 합쳐 최대 MaxPulses개.
 /// </summary>
@@ -18,7 +19,7 @@ public class SoundPulseManager : MonoBehaviour
     /// <summary>펄스 소리가 날 때마다 호출 (나중에 AI 청각 등에 사용)</summary>
     public static event Action<Vector3, float, GameObject> OnSound;
 
-    [Header("펄스 모양 (초)")]
+    [Header("펄스 기본 모양 (초) - 시간을 따로 넘기지 않는 소리에 사용")]
     [Tooltip("반경이 0 → 목표 반경까지 퍼지는 시간")]
     [SerializeField, Min(0.01f)] private float expandTime = 0.8f;
     [Tooltip("다 퍼진 뒤 최대 밝기로 유지되는 시간")]
@@ -31,7 +32,10 @@ public class SoundPulseManager : MonoBehaviour
         public Vector3 position;
         public float radius;
         public float age;
+        public float expand, hold, fade;
         public GameObject source;
+
+        public float Lifetime => expand + hold + fade;
     }
 
     private struct Field
@@ -52,8 +56,6 @@ public class SoundPulseManager : MonoBehaviour
     private static readonly int DataId = Shader.PropertyToID("_SonarPulseData");
     private static readonly int CountId = Shader.PropertyToID("_SonarPulseCount");
 
-    private float Lifetime => expandTime + holdTime + fadeTime;
-
     private void Awake()
     {
         if (Instance != null && Instance != this) { Destroy(this); return; }
@@ -68,16 +70,23 @@ public class SoundPulseManager : MonoBehaviour
 
     // ───────── 외부 호출 ─────────
 
-    /// <summary>① 펄스: 한 번 퍼졌다 사라지는 소리 (총소리 등)</summary>
+    /// <summary>① 펄스: 기본 모양(이 Inspector 값)으로 한 번 퍼졌다 사라지는 소리</summary>
     public static void Emit(Vector3 position, float radius, GameObject source = null)
     {
+        if (Instance == null) { OnSound?.Invoke(position, radius, source); return; }
+        Emit(position, radius, source, Instance.expandTime, Instance.holdTime, Instance.fadeTime);
+    }
+
+    /// <summary>① 펄스: 모양(퍼짐/유지/사라짐 시간)을 직접 지정</summary>
+    public static void Emit(Vector3 position, float radius, GameObject source, float expand, float hold, float fade)
+    {
         OnSound?.Invoke(position, radius, source);
-        if (Instance != null) Instance.AddPulse(position, radius, source);
+        if (Instance != null) Instance.AddPulse(position, radius, source, expand, hold, fade);
     }
 
     /// <summary>
     /// ② 필드: 소유자별로 하나씩 유지되는 실시간 소리 범위 (이동 소리 등).
-    /// 매 프레임 호출해서 위치/반경/밝기 갱신. intensity가 0 이하면 제거.
+    /// 매 프레임 호출해서 위치/반경/밝기 갱신. intensity나 radius가 0 이하면 제거.
     /// </summary>
     public static void SetField(GameObject owner, Vector3 position, float radius, float intensity)
     {
@@ -91,9 +100,18 @@ public class SoundPulseManager : MonoBehaviour
         Instance.fields[owner] = new Field { position = position, radius = radius, intensity = Mathf.Clamp01(intensity) };
     }
 
-    private void AddPulse(Vector3 position, float radius, GameObject source)
+    private void AddPulse(Vector3 position, float radius, GameObject source, float expand, float hold, float fade)
     {
-        var p = new Pulse { position = position, radius = radius, age = 0f, source = source };
+        var p = new Pulse
+        {
+            position = position,
+            radius = radius,
+            age = 0f,
+            expand = Mathf.Max(0.01f, expand),
+            hold = Mathf.Max(0f, hold),
+            fade = Mathf.Max(0.01f, fade),
+            source = source
+        };
 
         if (pulses.Count < MaxPulses) { pulses.Add(p); return; }
 
@@ -113,15 +131,13 @@ public class SoundPulseManager : MonoBehaviour
         foreach (var key in fields.Keys) if (key == null) deadKeys.Add(key);
         foreach (var key in deadKeys) fields.Remove(key);
 
-        float dt = Time.deltaTime;
-        float life = Lifetime;
-
         // 펄스 수명 처리
+        float dt = Time.deltaTime;
         for (int i = pulses.Count - 1; i >= 0; i--)
         {
             var p = pulses[i];
             p.age += dt;
-            if (p.age >= life) { pulses.RemoveAt(i); continue; }
+            if (p.age >= p.Lifetime) { pulses.RemoveAt(i); continue; }
             pulses[i] = p;
         }
 
@@ -142,11 +158,11 @@ public class SoundPulseManager : MonoBehaviour
             if (n >= MaxPulses) break;
 
             // 퍼짐: 빠르게 시작해서 부드럽게 멈춤 (ease-out)
-            float e = Mathf.Clamp01(p.age / expandTime);
+            float e = Mathf.Clamp01(p.age / p.expand);
             float radiusNow = p.radius * (1f - (1f - e) * (1f - e));
 
             // 밝기: expand+hold 동안 1 → fade 동안 0
-            float fadeT = Mathf.Clamp01((p.age - expandTime - holdTime) / fadeTime);
+            float fadeT = Mathf.Clamp01((p.age - p.expand - p.hold) / p.fade);
             float intensity = 1f - fadeT;
 
             // 앞쪽 링 강조: 퍼지는 동안만

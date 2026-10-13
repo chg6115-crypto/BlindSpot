@@ -1,6 +1,7 @@
 // BlindSpot - 소리 펄스 외곽선 (Full Screen Pass Renderer Feature 용)
 // SonarDepthFeature가 그린 "캐릭터 없는" 깊이/노멀로 외곽선을 찾는다 → 캐릭터 자리에도 뒤 배경 선이 이어짐.
 // 소리 범위(SoundPulseManager) 안에서만 표시. 바닥(위를 향한 면)은 월드 격자로 표시.
+// 깊이 외곽선은 "꺾임(2차 차이)"으로 판정 → 비스듬히 본 평평한 벽이 통째로 빛나지 않음.
 Shader "BlindSpot/SonarOutline"
 {
     Properties
@@ -95,10 +96,14 @@ Shader "BlindSpot/SonarOutline"
 
                 float3 nA = Normal(uvA), nB = Normal(uvB), nC = Normal(uvC), nD = Normal(uvD);
 
-                // 깊이 (거리에 비례해 정규화 → 멀리 있는 면도 같은 기준)
+                // 깊이: "꺾임(2차 차이)"으로 판정 → 비스듬히 본 평평한 벽은 0, 실제 모서리/경계만 큼
+                // (1/깊이는 평면 위에서 화면 방향으로 일정하게 변하므로 평면에서는 2차 차이가 0)
                 float d0 = EyeDepth(uv);
                 float dA = EyeDepth(uvA), dB = EyeDepth(uvB), dC = EyeDepth(uvC), dD = EyeDepth(uvD);
-                float depthDiff = sqrt((dA - dB) * (dA - dB) + (dC - dD) * (dC - dD)) / max(d0, 0.001);
+                float i0 = 1.0 / max(d0, 0.001);
+                float iA = 1.0 / max(dA, 0.001), iB = 1.0 / max(dB, 0.001);
+                float iC = 1.0 / max(dC, 0.001), iD = 1.0 / max(dD, 0.001);
+                float depthDiff = (abs(iA + iB - 2.0 * i0) + abs(iC + iD - 2.0 * i0)) / i0;
                 float depthEdge = smoothstep(_DepthThreshold, _DepthThreshold + 0.5, depthDiff * _DepthSensitivity);
 
                 // 주변 4점이 모두 바닥이면 → 바닥끼리의 요철이므로 깊이 선 무시

@@ -8,6 +8,7 @@ using UnityEngine.Rendering.Universal;
 /// <summary>
 /// 소나 외곽선 전용 깊이/노멀 텍스처를 그리는 Renderer Feature.
 ///  - Layer Mask에서 Character를 빼면 캐릭터가 없는 것처럼 배경만 그려짐
+///  - Override Shader(SonarDepthNormals)로 그려서 노멀맵 질감을 무시 → 벽/바닥 자글자글함 제거
 ///  - 결과: _SonarDepthTexture, _SonarNormalsTexture (SonarOutline 셰이더가 사용)
 ///  - URP 기본 깊이/노멀 텍스처는 건드리지 않음 → 플레이어 데칼, SSAO 영향 없음
 /// PC_Renderer → Add Renderer Feature → Sonar Depth Feature
@@ -17,10 +18,14 @@ public class SonarDepthFeature : ScriptableRendererFeature
     [Tooltip("소나 외곽선 계산에 포함할 레이어. Character를 빼야 캐릭터를 무시하고 그 뒤 배경 선이 그려짐")]
     public LayerMask layerMask = ~0;
 
+    [Tooltip("노멀맵을 무시하는 전용 셰이더 (Hidden/BlindSpot/SonarDepthNormals). 비우면 각 머티리얼의 노멀맵이 반영됨")]
+    public Shader overrideShader;
+
     private SonarDepthPass pass;
 
     public override void Create()
     {
+        if (overrideShader == null) overrideShader = Shader.Find("Hidden/BlindSpot/SonarDepthNormals");
         pass = new SonarDepthPass { renderPassEvent = RenderPassEvent.AfterRenderingOpaques };
     }
 
@@ -30,6 +35,7 @@ public class SonarDepthFeature : ScriptableRendererFeature
         if (type == CameraType.Preview || type == CameraType.Reflection) return;
 
         pass.layerMask = layerMask;
+        pass.overrideShader = overrideShader;
         renderer.EnqueuePass(pass);
     }
 
@@ -41,14 +47,19 @@ public class SonarDepthFeature : ScriptableRendererFeature
     private class SonarDepthPass : ScriptableRenderPass
     {
         public LayerMask layerMask;
+        public Shader overrideShader;
 
         private RTHandle depthHandle;
         private RTHandle normalsHandle;
 
+        // 이 패스를 가진 셰이더의 오브젝트를 그림 (덮어쓰기 셰이더 사용 시에도 대상 선별용)
         private static readonly List<ShaderTagId> Tags = new List<ShaderTagId>
         {
             new ShaderTagId("DepthNormals"),
             new ShaderTagId("DepthNormalsOnly"),
+            new ShaderTagId("UniversalForward"),
+            new ShaderTagId("UniversalForwardOnly"),
+            new ShaderTagId("SRPDefaultUnlit"),
         };
 
         private static readonly int DepthId = Shader.PropertyToID("_SonarDepthTexture");
@@ -97,6 +108,12 @@ public class SonarDepthFeature : ScriptableRendererFeature
             TextureHandle depth = renderGraph.ImportTexture(depthHandle);
 
             var drawSettings = RenderingUtils.CreateDrawingSettings(Tags, renderingData, cameraData, lightData, cameraData.defaultOpaqueSortFlags);
+            if (overrideShader != null)
+            {
+                drawSettings.overrideShader = overrideShader;      // 노멀맵 무시
+                drawSettings.overrideShaderPassIndex = 0;
+            }
+
             var filter = new FilteringSettings(RenderQueueRange.opaque, layerMask);
             var listParams = new RendererListParams(renderingData.cullResults, drawSettings, filter);
 
@@ -114,7 +131,7 @@ public class SonarDepthFeature : ScriptableRendererFeature
                 builder.SetRenderFunc((PassData d, RasterGraphContext ctx) =>
                 {
                     ctx.cmd.ClearRenderTarget(true, true, Color.clear);
-                    ctx.cmd.SetKeyword(OctNormalsKeyword, false);       // 노멀을 압축하지 않고 그대로 출력
+                    ctx.cmd.SetKeyword(OctNormalsKeyword, false);       // (머티리얼 셰이더 사용 시) 노멀 압축 끔
                     ctx.cmd.SetKeyword(RenderingLayersKeyword, false);  // 두 번째 출력(렌더링 레이어) 끔
                     ctx.cmd.DrawRendererList(d.list);
                 });

@@ -16,6 +16,7 @@ MonoBehaviour:
   layerMask:
     serializedVersion: 2
     m_Bits: 439
+  overrideShader: {fileID: 4800000, guid: aeaf4479253bdbe4aa3aca4f745d9f20, type: 3}
 --- !u!114 &-2772282212830529210
 MonoBehaviour:
   m_ObjectHideFlags: 1
