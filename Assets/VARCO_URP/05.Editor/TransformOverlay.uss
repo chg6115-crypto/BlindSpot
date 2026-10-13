@@ -1,0 +1,110 @@
+:root {
+    --panel-bg: #25282d;
+    --panel-border: #3b4047;
+    --text-main: #e4e7eb;
+    --text-muted: #b9bec5;
+    --button-border: #626871;
+}
+
+.transform-overlay-panel {
+    width: 200px;
+    padding: 4px;
+}
+
+.rotation-panel {
+    margin-top: 4px;
+}
+
+.rotation-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.rotation-axis-label {
+    min-width: 30px;
+    color: var(--text-muted);
+    -unity-font-style: bold;
+}
+
+.rotation-button {
+    margin-right: 4px;
+    color: var(--text-main);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: var(--button-border);
+    border-right-color: var(--button-border);
+    border-bottom-color: var(--button-border);
+    border-left-color: var(--button-border);
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    transition-duration: 0.08s;
+}
+
+.rotation-button-dark {
+    background-color: #30343a;
+}
+
+.rotation-button-dark:hover {
+    background-color: #41464d;
+}
+
+.rotation-button-soft {
+    background-color: #555b63;
+}
+
+.rotation-button-soft:hover {
+    background-color: #686f78;
+}
+
+.rotation-button:active {
+    background-color: #24272b;
+}
+
+.transform-action-bar {
+    flex-direction: row;
+    margin-top: 4px;
+}
+
+.transform-action-button {
+    color: var(--text-main);
+    border-top-width: 1px;
+    border-right-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-top-color: #646a72;
+    border-right-color: #646a72;
+    border-bottom-color: #646a72;
+    border-left-color: #646a72;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-bottom-left-radius: 4px;
+    transition-duration: 0.08s;
+}
+
+.transform-copy-button {
+    background-color: #484e55;
+}
+
+.transform-paste-button {
+    background-color: #555c64;
+}
+
+.transform-reset-button {
+    background-color: #30343a;
+    color: #c8cdd3;
+}
+
+.transform-action-button:hover {
+    background-color: #666d76;
+    color: #ffffff;
+}
+
+.transform-action-button:active {
+    background-color: #292d32;
+}
