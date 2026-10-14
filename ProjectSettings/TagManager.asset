@@ -45,7 +45,7 @@ TagManager:
   m_RenderingLayers:
   - Default
   - Player
-  - Light Layer 2
+  - LocalPlayer
   - Light Layer 3
   - Light Layer 4
   - Light Layer 5

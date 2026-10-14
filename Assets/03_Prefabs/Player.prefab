@@ -1502,6 +1502,7 @@ GameObject:
   - component: {fileID: 6111961729347423730}
   - component: {fileID: 1686839382067430744}
   - component: {fileID: 3401257860942261216}
+  - component: {fileID: 4710070957385065519}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -1733,6 +1734,26 @@ MonoBehaviour:
   localPlayerTag: Player
   showHud: 1
   hudFontSize: 18
+--- !u!114 &4710070957385065519
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4357718914165031986}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9286e9a764df62f45ac8d44c6bd09cd8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Health
+  maxHealth: 100
+  flashPlayerDecalOnHit: 0
+  flashMannequinDecalOnHit: 1
+  flashCount: 2
+  flashOnTime: 0.06
+  flashOffTime: 0.08
+  mannequinTag: Mannequin
+  showHud: 1
 --- !u!1 &4364965278409463526
 GameObject:
   m_ObjectHideFlags: 0

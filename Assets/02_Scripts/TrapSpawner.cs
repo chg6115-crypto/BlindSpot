@@ -244,14 +244,18 @@ public class TrapSpawner : MonoBehaviour
 
     private IEnumerable<Vector3> GetPlayerPositions()
     {
-        if (playerSpawns != null && playerSpawns.Length > 0)
-        {
-            foreach (var t in playerSpawns) if (t != null) yield return t.position;
-        }
-        else
-        {
-            foreach (var p in GameObject.FindGameObjectsWithTag("Player")) yield return p.transform.position;
-        }
+        // 직접 넣은 목록 → 없으면 RoundManager의 스폰 위치 사용
+        Transform[] points = (playerSpawns != null && playerSpawns.Length > 0)
+            ? playerSpawns
+            : (RoundManager.Instance != null ? RoundManager.Instance.SpawnPoints : null);
+
+        if (points != null)
+            foreach (var t in points)
+                if (t != null) yield return t.position;
+
+        // 현재 플레이어 위치도 항상 피함
+        foreach (var p in GameObject.FindGameObjectsWithTag("Player"))
+            yield return p.transform.position;
     }
 
     // ───────── NavMesh 랜덤 지점 ─────────

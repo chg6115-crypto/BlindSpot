@@ -8,6 +8,7 @@ using UnityEngine.InputSystem;
 /// 모든 디버그 기능을 한 곳에서 관리 (에디터 / Development Build 전용)
 ///  - 숫자 키로 실행, 0키로 메뉴 창 열기/닫기 (메뉴의 버튼을 눌러도 실행)
 ///  - 각 시스템의 공개 함수를 호출하는 방식
+///  - RoundManager가 있으면 킬/데스·라운드 넘기기를 라운드 시스템으로 보냄
 /// DebugTools 오브젝트에 붙여서 사용.
 /// </summary>
 public class DebugMenu : MonoBehaviour
@@ -24,8 +25,8 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] private TrapSpawner trapSpawner;
 
     [Header("점수 테스트")]
-    [Tooltip("랜덤 킬 시 자동 등록할 가짜 플레이어 수")]
-    [SerializeField, Min(0)] private int fakePlayers = 4;
+    [Tooltip("랜덤 킬 시 자동 등록할 가짜 플레이어 수 (나 포함 최대 4명이면 3)")]
+    [SerializeField, Min(0)] private int fakePlayers = 3;
 
     [Header("메뉴")]
     [SerializeField] private bool showOnStart = false;
@@ -57,12 +58,13 @@ public class DebugMenu : MonoBehaviour
         Add(Key.Digit1, "손전등", ToggleFlashlight, () => OnOff(flashlight != null && flashlight.enabled));
         Add(Key.Digit2, "맵 전체 밝게", ToggleBright, () => OnOff(brightOn));
         Add(Key.Digit3, "현재 위치를 발사 위치로 기록", RecordShot, null);
-        Add(Key.Digit4, "라운드 넘기기 (마네킹·트랩 재배치)", NextRound, null);
+        Add(Key.Digit4, "라운드 강제 종료", NextRound, RoundState);
         Add(Key.Digit5, "랜덤 킬", RandomKill, null);
         Add(Key.Digit6, "내 데스 +1", LocalDeath, null);
         Add(Key.Digit7, "점수 초기화", ResetScores, null);
         Add(Key.Digit8, "트랩 데칼 항상 표시", ToggleTrapDecals, () => OnOff(TrapBase.DebugShowAll));
         Add(Key.Digit9, "캐릭터 데칼 항상 켜기", ToggleCharacterDecals, () => OnOff(DecalBlink.DebugForceOn));
+        Add(Key.F5, "경기 재시작", RestartMatch, null);
     }
 
     private void Start()
@@ -85,6 +87,12 @@ public class DebugMenu : MonoBehaviour
     }
 
     private static string OnOff(bool on) => on ? "ON" : "OFF";
+
+    private static string RoundState()
+    {
+        var rm = RoundManager.Instance;
+        return rm != null ? $"{rm.CurrentState} {rm.CurrentRound}/{rm.TotalRounds}" : "RoundManager 없음";
+    }
 
     // ───────── 입력 ─────────
 
@@ -129,13 +137,27 @@ public class DebugMenu : MonoBehaviour
 
     private void NextRound()
     {
+        var rm = RoundManager.Instance;
+        if (rm != null)
+        {
+            rm.ForceEndRound();
+            Debug.Log("[DebugMenu] 라운드 강제 종료");
+            return;
+        }
+
+        // RoundManager가 없을 때: 예전처럼 바로 재배치
         if (mannequinSpawner != null)
         {
             mannequinSpawner.EndRound();
             mannequinSpawner.SpawnForRound();
         }
         if (trapSpawner != null) trapSpawner.SpawnForRound();
-        Debug.Log("[DebugMenu] 라운드 넘김");
+        Debug.Log("[DebugMenu] 라운드 넘김 (재배치)");
+    }
+
+    private void RestartMatch()
+    {
+        if (RoundManager.Instance != null) RoundManager.Instance.StartMatch();
     }
 
     // ───────── 점수 ─────────
@@ -146,13 +168,19 @@ public class DebugMenu : MonoBehaviour
         if (sm == null) return;
 
         EnsureFakePlayers(sm);
-        var ids = sm.GetSorted().Select(s => s.id).ToList();
+        var rm = RoundManager.Instance;
+
+        List<int> ids = rm != null
+            ? rm.AliveIds.ToList()
+            : sm.GetSorted().Select(s => s.id).ToList();
         if (ids.Count < 2) return;
 
         int killer = ids[UnityEngine.Random.Range(0, ids.Count)];
         int victim;
         do { victim = ids[UnityEngine.Random.Range(0, ids.Count)]; } while (victim == killer);
-        sm.AddKill(killer, victim);
+
+        if (rm != null) rm.ReportKill(killer, victim);
+        else sm.AddKill(killer, victim);
     }
 
     private void LocalDeath()
@@ -161,9 +189,14 @@ public class DebugMenu : MonoBehaviour
         if (sm == null) return;
 
         EnsureFakePlayers(sm);
-        var others = sm.GetSorted().Where(s => s.id != sm.LocalPlayerId).Select(s => s.id).ToList();
+        var rm = RoundManager.Instance;
+
+        var pool = rm != null ? rm.AliveIds.ToList() : sm.GetSorted().Select(s => s.id).ToList();
+        var others = pool.Where(id => id != sm.LocalPlayerId).ToList();
         int killer = others.Count > 0 ? others[UnityEngine.Random.Range(0, others.Count)] : -1;
-        sm.AddKill(killer, sm.LocalPlayerId);
+
+        if (rm != null) rm.ReportKill(killer, sm.LocalPlayerId);
+        else sm.AddKill(killer, sm.LocalPlayerId);
     }
 
     private void ResetScores()
@@ -175,7 +208,11 @@ public class DebugMenu : MonoBehaviour
     {
         int bots = sm.GetSorted().Count(s => !s.isLocal);
         for (int i = bots; i < fakePlayers; i++)
-            if (sm.Register($"BOT_{i + 1:00}") < 0) break;   // 최대 인원이면 중단
+        {
+            int id = sm.Register($"BOT_{i + 1:00}");
+            if (id < 0) break;   // 최대 인원이면 중단
+            if (RoundManager.Instance != null) RoundManager.Instance.RegisterParticipant(id);
+        }
     }
 
     // ───────── 트랩 / 데칼 ─────────
