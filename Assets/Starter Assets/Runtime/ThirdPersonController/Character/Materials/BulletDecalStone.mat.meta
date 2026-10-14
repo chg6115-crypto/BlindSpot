@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a29767879f97b364393df3a772628180
+timeCreated: 1473678406
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 259143
+  packageName: Multiplayer FPS Template
+  packageVersion: 1.2.2
+  assetPath: Assets/Starter Assets/Runtime/ThirdPersonController/Character/Materials/BulletDecalStone.mat
+  uploadId: 987820

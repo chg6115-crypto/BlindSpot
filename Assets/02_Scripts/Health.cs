@@ -1,9 +1,10 @@
 using System;
+using System.Collections;
 using UnityEngine;
 
 /// <summary>
 /// 체력. Player 프리팹 루트에 붙임 (마네킹 Variant도 자동으로 같이 가짐).
-///  - 마네킹(Mannequin 태그): 체력 없음. 맞으면 데칼만 발광 (쓰러지지 않음)
+///  - 마네킹(Mannequin 태그): 체력 없음. 한 대 맞으면 데칼 발광 + 쓰러진 뒤 사라짐 (킬 기록 없음)
 ///  - 플레이어: 맞으면 체력 감소 (데칼 발광은 기본 꺼짐), 0이 되면 사망 → RoundManager에 킬 보고
 ///  - 로컬 플레이어(Player 태그)는 ScoreManager의 LocalPlayerId를 사용
 ///  - 디버그 봇은 SetupAsBot()으로 플레이어 등록
@@ -25,6 +26,14 @@ public class Health : MonoBehaviour
 
     [Header("마네킹 판정")]
     [SerializeField] private string mannequinTag = "Mannequin";
+
+    [Header("마네킹 쓰러짐")]
+    [Tooltip("마네킹이 한 대 맞으면 쓰러짐 (끄면 데칼만 발광하고 계속 서 있음)")]
+    [SerializeField] private bool mannequinFallsOnHit = true;
+    [Tooltip("쓰러지는 데 걸리는 시간 (초)")]
+    [SerializeField, Min(0.05f)] private float fallDuration = 0.35f;
+    [Tooltip("쓰러진 뒤 사라지기까지 시간 (초). 0이면 사라지지 않고 누워 있음")]
+    [SerializeField, Min(0f)] private float hideDelay = 1.5f;
 
     [Header("임시 HUD (로컬 플레이어만)")]
     [SerializeField] private bool showHud = true;
@@ -92,11 +101,17 @@ public class Health : MonoBehaviour
     {
         if (IsDead || amount <= 0f) return;
 
-        // 마네킹: 체력 없음, 데칼만 발광
+        // 마네킹: 체력 없음, 데칼 발광 + 한 대에 쓰러짐
         if (IsMannequin)
         {
             if (flashMannequinDecalOnHit) FlashDecal();
             OnDamaged?.Invoke(this, amount, attacker);
+
+            if (mannequinFallsOnHit)
+            {
+                IsDead = true;   // 중복 피격 방지
+                StartCoroutine(MannequinFall(attacker));
+            }
             return;
         }
 
@@ -149,6 +164,48 @@ public class Health : MonoBehaviour
 
     // ───────── 연출 ─────────
 
+    /// <summary>마네킹: 공격자 반대 방향으로 뒤로 넘어진 뒤 사라짐 (다음 라운드에 스포너가 새로 배치)</summary>
+    private IEnumerator MannequinFall(GameObject attacker)
+    {
+        // 바로 충돌 끄기 → 시체에 총알/트랩이 걸리지 않음
+        foreach (var c in colliders) if (c != null) c.enabled = false;
+
+        // 애니메이션 정지 (쓰러진 자세 그대로 유지)
+        var anim = GetComponentInChildren<Animator>();
+        if (anim != null) anim.enabled = false;
+
+        // 넘어질 방향: 공격자 → 마네킹 방향 (없으면 마네킹 뒤쪽)
+        Vector3 away = -transform.forward;
+        if (attacker != null)
+        {
+            away = transform.position - attacker.transform.position;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.0001f) away = -transform.forward;
+        }
+        away.Normalize();
+        Vector3 axis = Vector3.Cross(Vector3.up, away);   // 이 축으로 90도 돌면 away 쪽으로 넘어짐
+
+        Quaternion start = transform.rotation;
+        Quaternion end = Quaternion.AngleAxis(90f, axis) * start;
+
+        float t = 0f;
+        while (t < fallDuration)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / fallDuration);
+            k = k * k;   // 처음엔 천천히, 점점 빠르게
+            transform.rotation = Quaternion.Slerp(start, end, k);
+            yield return null;
+        }
+        transform.rotation = end;
+
+        if (hideDelay > 0f)
+        {
+            yield return new WaitForSeconds(hideDelay);
+            SetBodyActive(false);
+        }
+    }
+
     private void FlashDecal()
     {
         if (decal != null) decal.ForceFlash(flashCount, flashOnTime, flashOffTime);
@@ -179,4 +236,4 @@ public class Health : MonoBehaviour
         hudStyle.normal.textColor = Current > maxHealth * 0.3f ? new Color(0.85f, 0.9f, 1f) : new Color(1f, 0.4f, 0.4f);
         GUI.Label(new Rect(24, Screen.height - 60, 300, 30), $"HP {Mathf.CeilToInt(Current)}", hudStyle);
     }
-}
+}

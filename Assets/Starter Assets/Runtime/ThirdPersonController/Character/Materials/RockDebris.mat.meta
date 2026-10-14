@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 586b03ea88dd46c42b5eb8af4d0c137a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 259143
+  packageName: Multiplayer FPS Template
+  packageVersion: 1.2.2
+  assetPath: Assets/Starter Assets/Runtime/ThirdPersonController/Character/Materials/RockDebris.mat
+  uploadId: 987820

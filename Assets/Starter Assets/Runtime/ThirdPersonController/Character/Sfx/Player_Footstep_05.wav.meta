@@ -22,8 +22,8 @@ AudioImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 196526
-  packageName: First Person + Third Person | Character Controllers
-  packageVersion: 2.0.1
+  productId: 259143
+  packageName: Multiplayer FPS Template
+  packageVersion: 1.2.2
   assetPath: Assets/Starter Assets/Runtime/ThirdPersonController/Character/Sfx/Player_Footstep_05.wav
-  uploadId: 998422
+  uploadId: 987820

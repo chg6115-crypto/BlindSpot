@@ -918,8 +918,8 @@ ModelImporter:
   assetBundleVariant: 
 AssetOrigin:
   serializedVersion: 1
-  productId: 196526
-  packageName: First Person + Third Person | Character Controllers
-  packageVersion: 2.0.1
+  productId: 259143
+  packageName: Multiplayer FPS Template
+  packageVersion: 1.2.2
   assetPath: Assets/Starter Assets/Runtime/ThirdPersonController/Character/Animations/Jump--InAir.anim.fbx
-  uploadId: 998422
+  uploadId: 987820

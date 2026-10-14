@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: ce4b77858ec6c0f469b07b034c21a85f
+timeCreated: 1473953683
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 259143
+  packageName: Multiplayer FPS Template
+  packageVersion: 1.2.2
+  assetPath: Assets/Starter Assets/Runtime/ThirdPersonController/Character/Materials/WoodSurface.mat
+  uploadId: 987820
