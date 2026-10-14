@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.InputSystem;
 
 /// <summary>
 /// 모든 디버그 기능을 한 곳에서 관리 (에디터 / Development Build 전용)
-///  - 숫자 키로 실행, 0키로 메뉴 창 열기/닫기 (메뉴의 버튼을 눌러도 실행)
+///  - 키패드 숫자로 실행, 키패드 0으로 메뉴 창 열기/닫기 (메뉴의 버튼을 눌러도 실행)
+///  - 일반 숫자키 1·2는 무기 전환용으로 비워둠
 ///  - 각 시스템의 공개 함수를 호출하는 방식
 ///  - RoundManager가 있으면 킬/데스·라운드 넘기기를 라운드 시스템으로 보냄
 /// DebugTools 오브젝트에 붙여서 사용.
@@ -24,11 +26,18 @@ public class DebugMenu : MonoBehaviour
     [SerializeField] private MannequinSpawner mannequinSpawner;
     [SerializeField] private TrapSpawner trapSpawner;
 
+    [Header("봇 소환 (F6)")]
+    [Tooltip("PlayerVariant_Mannequin 프리팹")]
+    [SerializeField] private GameObject botPrefab;
+    [Tooltip("내 앞 몇 m에 소환할지")]
+    [SerializeField, Min(1f)] private float botSpawnDistance = 3f;
+
     [Header("점수 테스트")]
     [Tooltip("랜덤 킬 시 자동 등록할 가짜 플레이어 수 (나 포함 최대 4명이면 3)")]
     [SerializeField, Min(0)] private int fakePlayers = 3;
 
     [Header("메뉴")]
+    [SerializeField] private Key menuKey = Key.Numpad0;
     [SerializeField] private bool showOnStart = false;
     [SerializeField] private int fontSize = 16;
 
@@ -44,6 +53,7 @@ public class DebugMenu : MonoBehaviour
     private bool visible;
     private bool brightOn;
     private Color savedAmbient;
+    private int botCount;
     private GUIStyle boxStyle, labelStyle, titleStyle, buttonStyle;
 
     // ───────── 초기화 ─────────
@@ -54,17 +64,18 @@ public class DebugMenu : MonoBehaviour
         if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
         if (trapSpawner == null) trapSpawner = FindAnyObjectByType<TrapSpawner>();
 
-        // 키 배정은 여기 한 곳에서 관리
-        Add(Key.Digit1, "손전등", ToggleFlashlight, () => OnOff(flashlight != null && flashlight.enabled));
-        Add(Key.Digit2, "맵 전체 밝게", ToggleBright, () => OnOff(brightOn));
-        Add(Key.Digit3, "현재 위치를 발사 위치로 기록", RecordShot, null);
-        Add(Key.Digit4, "라운드 강제 종료", NextRound, RoundState);
-        Add(Key.Digit5, "랜덤 킬", RandomKill, null);
-        Add(Key.Digit6, "내 데스 +1", LocalDeath, null);
-        Add(Key.Digit7, "점수 초기화", ResetScores, null);
-        Add(Key.Digit8, "트랩 데칼 항상 표시", ToggleTrapDecals, () => OnOff(TrapBase.DebugShowAll));
-        Add(Key.Digit9, "캐릭터 데칼 항상 켜기", ToggleCharacterDecals, () => OnOff(DecalBlink.DebugForceOn));
+        // 키 배정은 여기 한 곳에서 관리 (키패드)
+        Add(Key.Numpad1, "손전등", ToggleFlashlight, () => OnOff(flashlight != null && flashlight.enabled));
+        Add(Key.Numpad2, "맵 전체 밝게", ToggleBright, () => OnOff(brightOn));
+        Add(Key.Numpad3, "현재 위치를 발사 위치로 기록", RecordShot, null);
+        Add(Key.Numpad4, "라운드 강제 종료", NextRound, RoundState);
+        Add(Key.Numpad5, "랜덤 킬", RandomKill, null);
+        Add(Key.Numpad6, "내 데스 +1", LocalDeath, null);
+        Add(Key.Numpad7, "점수 초기화", ResetScores, null);
+        Add(Key.Numpad8, "트랩 데칼 항상 표시", ToggleTrapDecals, () => OnOff(TrapBase.DebugShowAll));
+        Add(Key.Numpad9, "캐릭터 데칼 항상 켜기", ToggleCharacterDecals, () => OnOff(DecalBlink.DebugForceOn));
         Add(Key.F5, "경기 재시작", RestartMatch, null);
+        Add(Key.F6, "적 봇 소환 (내 앞)", SpawnBot, null);
     }
 
     private void Start()
@@ -88,6 +99,8 @@ public class DebugMenu : MonoBehaviour
 
     private static string OnOff(bool on) => on ? "ON" : "OFF";
 
+    private static string KeyName(Key key) => key.ToString().Replace("Numpad", "Num ");
+
     private static string RoundState()
     {
         var rm = RoundManager.Instance;
@@ -102,7 +115,7 @@ public class DebugMenu : MonoBehaviour
         var kb = Keyboard.current;
         if (kb == null) return;
 
-        if (kb[Key.Digit0].wasPressedThisFrame) visible = !visible;
+        if (kb[menuKey].wasPressedThisFrame) visible = !visible;
 
         foreach (var e in entries)
             if (kb[e.key].wasPressedThisFrame) e.action?.Invoke();
@@ -158,6 +171,29 @@ public class DebugMenu : MonoBehaviour
     private void RestartMatch()
     {
         if (RoundManager.Instance != null) RoundManager.Instance.StartMatch();
+    }
+
+    private void SpawnBot()
+    {
+        var p = GameObject.FindWithTag("Player");
+        if (botPrefab == null)
+        {
+            Debug.LogWarning("[DebugMenu] Bot Prefab이 비어 있습니다 (PlayerVariant_Mannequin 연결).", this);
+            return;
+        }
+        if (p == null) return;
+
+        Vector3 pos = p.transform.position + p.transform.forward * botSpawnDistance;
+        if (NavMesh.SamplePosition(pos, out var hit, 2f, NavMesh.AllAreas))
+            pos = hit.position;
+
+        var bot = Instantiate(botPrefab, pos, Quaternion.LookRotation(-p.transform.forward));
+        bot.name = $"EnemyBot_{++botCount:00}";
+
+        var h = bot.GetComponent<Health>();
+        if (h != null) h.SetupAsBot($"ENEMY_{botCount:00}");
+
+        Debug.Log($"[DebugMenu] 적 봇 소환: {bot.name}");
     }
 
     // ───────── 점수 ─────────
@@ -240,17 +276,16 @@ public class DebugMenu : MonoBehaviour
         EnsureStyles();
 
         // 영역은 넉넉하게 잡고, 박스(Vertical)가 내용 크기만큼만 그려지게
-        GUILayout.BeginArea(new Rect(16, 16, 460f, Screen.height - 32));
+        GUILayout.BeginArea(new Rect(16, 16, 480f, Screen.height - 32));
         GUILayout.BeginVertical(boxStyle);
 
-        GUILayout.Label("DEBUG MENU   [0] 닫기", titleStyle);
+        GUILayout.Label($"DEBUG MENU   [{KeyName(menuKey)}] 닫기", titleStyle);
         GUILayout.Space(6);
 
         foreach (var e in entries)
         {
-            string keyName = e.key.ToString().Replace("Digit", "");
             string state = e.state != null ? $"  <b>{e.state()}</b>" : "";
-            if (GUILayout.Button($"[{keyName}]  {e.label}{state}", buttonStyle))
+            if (GUILayout.Button($"[{KeyName(e.key)}]  {e.label}{state}", buttonStyle))
                 e.action?.Invoke();
         }
 

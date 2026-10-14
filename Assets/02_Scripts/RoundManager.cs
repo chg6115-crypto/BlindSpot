@@ -12,12 +12,12 @@ using UnityEngine;
 ///  [경기]   totalRounds 라운드 후 총 킬 1위가 우승
 /// 사망은 ReportKill(killerId, victimId)로 알림 (나중에 체력 시스템에서 호출).
 /// MannequinSpawner / TrapSpawner 의 Spawn On Start 는 꺼둘 것 (RoundManager가 배치함).
-/// Freeze Components가 비어 있으면 플레이어의 vThirdPersonInput, SonarSkill을 자동으로 찾음.
+/// Freeze Components가 비어 있으면 플레이어의 FirstPersonController, vThirdPersonInput, SonarSkill을 자동으로 찾음.
 ///
 /// 스포트라이트는 "나에게만" 보이도록: 내 캐릭터 렌더러에 LocalPlayer 렌더링 레이어를 추가하고,
 /// 스포트라이트는 Default(바닥) + LocalPlayer(내 몸)만 비추게 설정 → 마네킹·다른 플레이어는 안 비춤.
 ///
-/// [나중에 FPS 전환] OnPlayStart(GO 순간) 이벤트에 1인칭 카메라 전환을 연결할 예정.
+/// OnPlayStart(GO 순간) 이벤트: 1인칭 연출 등 연결용.
 /// </summary>
 [DefaultExecutionOrder(50)]
 public class RoundManager : MonoBehaviour
@@ -59,7 +59,7 @@ public class RoundManager : MonoBehaviour
     [SerializeField] private Transform[] spawnPoints;
     [Tooltip("비워두면 Player 태그로 검색")]
     [SerializeField] private Transform localPlayer;
-    [Tooltip("카운트다운·사망·라운드 종료 중 꺼둘 컴포넌트. 비워두면 vThirdPersonInput, SonarSkill 자동 검색")]
+    [Tooltip("카운트다운·사망·라운드 종료 중 꺼둘 컴포넌트. 비워두면 FirstPersonController, vThirdPersonInput, SonarSkill 자동 검색")]
     [SerializeField] private Behaviour[] freezeComponents;
 
     [Header("연결 (비워두면 자동 검색)")]
@@ -72,7 +72,7 @@ public class RoundManager : MonoBehaviour
 
     /// <summary>라운드 시작 - 인트로 시작 시점 (라운드 번호)</summary>
     public event Action<int> OnRoundStart;
-    /// <summary>GO - 실제 플레이 시작 시점 (라운드 번호). 나중에 FPS 카메라 전환 연결</summary>
+    /// <summary>GO - 실제 플레이 시작 시점 (라운드 번호)</summary>
     public event Action<int> OnPlayStart;
     /// <summary>라운드 종료 (라운드 번호, 승자 id / 무승부 -1)</summary>
     public event Action<int, int> OnRoundEnd;
@@ -126,6 +126,11 @@ public class RoundManager : MonoBehaviour
         {
             var list = new List<Behaviour>();
 
+            // FPS 컨트롤러 (이동·시점·중력 모두 정지)
+            var fpc = localPlayer.GetComponentInChildren<StarterAssets.FirstPersonController>();
+            if (fpc != null) list.Add(fpc);
+
+            // 예전 TPS 컨트롤러 (있으면)
             var input = localPlayer.GetComponentInChildren<Invector.vCharacterController.vThirdPersonInput>();
             if (input != null) list.Add(input);
 
@@ -254,7 +259,7 @@ public class RoundManager : MonoBehaviour
         banner = "HIDE IN THE DARK";
         float bannerOff = Time.time + 1.5f;
         SetFrozen(false);
-        OnPlayStart?.Invoke(CurrentRound);   // ← 나중에 여기서 FPS 시점으로 전환
+        OnPlayStart?.Invoke(CurrentRound);
 
         while (!forceEnd && TimeLeft > 0f)
         {
@@ -388,16 +393,23 @@ public class RoundManager : MonoBehaviour
         Vector3 pos = point.position;
         Quaternion rot = Quaternion.Euler(0f, point.eulerAngles.y, 0f);
 
+        // CharacterController는 켜진 상태에서 위치를 바꾸면 되돌아갈 수 있어 잠깐 끔
+        var cc = target.GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+
         var rb = target.GetComponent<Rigidbody>();
-        if (rb != null)
+        if (rb != null && !rb.isKinematic)
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
             rb.position = pos;
             rb.rotation = rot;
         }
+
         target.SetPositionAndRotation(pos, rot);
         Physics.SyncTransforms();
+
+        if (cc != null) cc.enabled = true;
     }
 
     private void ResetAlive()
@@ -421,7 +433,7 @@ public class RoundManager : MonoBehaviour
         if (frozen && localPlayer != null)
         {
             var rb = localPlayer.GetComponent<Rigidbody>();
-            if (rb != null) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+            if (rb != null && !rb.isKinematic) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
         }
     }
 
