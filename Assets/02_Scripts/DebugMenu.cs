@@ -126,16 +126,48 @@ public class DebugMenu : MonoBehaviour
 
     private void ToggleFlashlight()
     {
-        if (flashlight != null) flashlight.enabled = !flashlight.enabled;
+        if (flashlight == null) return;
+        flashlight.gameObject.SetActive(true);   // 오브젝트가 꺼져 있어도 동작하게
+        flashlight.enabled = !flashlight.enabled;
     }
 
     private void ToggleBright() => SetBright(!brightOn);
 
+    private UnityEngine.Rendering.AmbientMode savedAmbientMode;
+    private float savedAmbientIntensity;
+    private bool savedAmbientStored;
+
     private void SetBright(bool on)
     {
+        if (on && !savedAmbientStored)
+        {
+            // 현재 환경광 설정 저장 (Skybox 모드여도 복구 가능하게)
+            savedAmbientMode = RenderSettings.ambientMode;
+            savedAmbientIntensity = RenderSettings.ambientIntensity;
+            savedAmbient = RenderSettings.ambientLight;
+            savedAmbientStored = true;
+        }
+
         brightOn = on;
-        RenderSettings.ambientLight = on ? debugAmbient : savedAmbient;
-        if (debugSun != null) debugSun.enabled = on;
+
+        if (on)
+        {
+            RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;   // Color 모드
+            RenderSettings.ambientLight = debugAmbient;
+        }
+        else if (savedAmbientStored)
+        {
+            RenderSettings.ambientMode = savedAmbientMode;
+            RenderSettings.ambientIntensity = savedAmbientIntensity;
+            RenderSettings.ambientLight = savedAmbient;
+            savedAmbientStored = false;
+        }
+
+        if (debugSun != null)
+        {
+            debugSun.gameObject.SetActive(true);   // 오브젝트가 꺼져 있어도 동작하게
+            debugSun.enabled = on;
+        }
     }
 
     // ───────── 마네킹 / 라운드 ─────────

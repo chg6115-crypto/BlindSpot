@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 33915994243064020}
   - component: {fileID: 23062965027642900}
   - component: {fileID: 64814754167519894}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Factory1Wall02Glass
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -125,7 +125,7 @@ GameObject:
   - component: {fileID: 33445651802379790}
   - component: {fileID: 23712230096269940}
   - component: {fileID: 64232432694500222}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Factory1Wall02
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -180,8 +180,8 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 16b7d755e8a9e82448cebb7861be060c, type: 2}
-  - {fileID: 2100000, guid: 586ce539a62d1a4409ecb060bd1b3bbf, type: 2}
+  - {fileID: 2100000, guid: 1db8bec6ecac9f542a72af101d567939, type: 2}
+  - {fileID: 2100000, guid: 1db8bec6ecac9f542a72af101d567939, type: 2}
   - {fileID: 2100000, guid: a5a3823a61e2c3840b5868db35d88fa1, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
@@ -237,7 +237,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4940169344458020}
-  m_Layer: 0
+  m_Layer: 8
   m_Name: Factory1Wall02
   m_TagString: Untagged
   m_Icon: {fileID: 0}
