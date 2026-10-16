@@ -2619,10 +2619,7 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 5294811659401635279, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 576826637}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
 --- !u!1001 &452413756
 PrefabInstance:
@@ -3098,40 +3095,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000010202300486, guid: 7efb7a11251ce1342b172668cbdc65c8, type: 3}
   m_PrefabInstance: {fileID: 576163306}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &576826635 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5294811659401635279, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-  m_PrefabInstance: {fileID: 443519891}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &576826637
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 576826635}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
-  m_UsePipelineSettings: 1
-  m_AdditionalLightsShadowResolutionTier: 2
-  m_CustomShadowLayers: 0
-  m_LightCookieSize: {x: 1, y: 1}
-  m_LightCookieOffset: {x: 0, y: 0}
-  m_SoftShadowQuality: 0
-  m_RenderingLayersMask:
-    serializedVersion: 0
-    m_Bits: 1
-  m_ShadowRenderingLayersMask:
-    serializedVersion: 0
-    m_Bits: 1
-  m_Version: 4
-  m_LightLayerMask: 1
-  m_ShadowLayerMask: 1
-  m_RenderingLayers: 1
-  m_ShadowRenderingLayers: 1
 --- !u!4 &580625503 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4000011048348644, guid: 84147b87204d0a0478bae9558d656ea2, type: 3}
@@ -7703,6 +7666,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1862935631}
   - component: {fileID: 1862935632}
+  - component: {fileID: 1862935633}
   m_Layer: 0
   m_Name: RoundManager
   m_TagString: Untagged
@@ -7764,6 +7728,26 @@ MonoBehaviour:
   trapSpawner: {fileID: 0}
   showHud: 1
   hudFontSize: 20
+--- !u!114 &1862935633
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1862935630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a3b5b21745fdc674ea3a46b313090db7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LoadoutSelector
+  switcher: {fileID: 0}
+  defaultIndex: 0
+  lockWithoutRoundManager: 0
+  showUI: 1
+  fontSize: 22
+  panelY: 0.72
+  normalColor: {r: 1, g: 1, b: 1, a: 0.55}
+  selectedColor: {r: 0.3, g: 1, b: 0.9, a: 1}
 --- !u!1001 &1868712164
 PrefabInstance:
   m_ObjectHideFlags: 0
