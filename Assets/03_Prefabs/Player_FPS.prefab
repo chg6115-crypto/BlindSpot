@@ -674,8 +674,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 122aecc5ab4d5724f825255fa6f41dab, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::FootstepPulse
-  walkRadius: 0
-  runRadius: 0
+  walkRadius: 20
+  runRadius: 20
   fadeInTime: 0.3
   fadeOutTime: 1
   radiusChangeTime: 0.5
