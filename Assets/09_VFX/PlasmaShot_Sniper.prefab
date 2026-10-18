@@ -5333,7 +5333,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 3
       minMaxState: 0
-      scalar: 0.1
+      scalar: 1
       minScalar: 0.15
       maxCurve:
         serializedVersion: 2

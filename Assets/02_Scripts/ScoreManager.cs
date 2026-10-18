@@ -56,6 +56,17 @@ public class ScoreManager : MonoBehaviour
         return id;
     }
 
+    /// <summary>이름 변경 (네트워크 닉네임이 나중에 도착할 때)</summary>
+    public void SetName(int id, string playerName)
+    {
+        if (string.IsNullOrEmpty(playerName)) return;
+        if (scores.TryGetValue(id, out var s) && s.name != playerName)
+        {
+            s.name = playerName;
+            OnScoreChanged?.Invoke();
+        }
+    }
+
     public void Unregister(int id)
     {
         if (scores.Remove(id)) OnScoreChanged?.Invoke();

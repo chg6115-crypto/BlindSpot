@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -19,6 +20,11 @@ using UnityEngine.InputSystem;
 ///  - 섬광: Animator가 처리하는 무기(권총)는 끄고, 없는 무기는 Create Flash Light로 순간 조명 생성
 ///  - 로컬 플레이어(루트가 Player 태그)에서만 입력을 받음
 ///  - FirstPersonController가 꺼져 있으면(카운트다운/사망 Freeze) 발사 불가
+///
+/// [네트워크 5단계]
+///  - 피해는 Health.TakeDamage로 보내면 네트워크 플레이어는 호스트가 처리 (산탄은 대상별로 합쳐 한 번만 전송)
+///  - 발사 결과(맞은 지점들)를 OnShotFx로 알림 → PlayerNetworkCombat이 다른 사람에게 전달
+///  - 다른 사람 화면에서는 PlayRemoteShot()으로 소리 + 빔/피격 이펙트만 재생
 /// </summary>
 public class GunWeapon : MonoBehaviour
 {
@@ -136,6 +142,8 @@ public class GunWeapon : MonoBehaviour
     /// <summary>발사했을 때 (첫 번째 맞은 지점, 맞은 Health 또는 null)</summary>
     public event Action<Vector3, Health> OnFired;
     public event Action OnReloadStarted;
+    /// <summary>발사 연출 정보 (총, 펠릿별 맞은 지점, 면 방향, 명중 여부) - 네트워크 전달용</summary>
+    public event Action<GunWeapon, Vector3[], Vector3[], bool[]> OnShotFx;
 
     public string WeaponName => weaponName;
     public float BarrelLength => barrelLength;
@@ -157,6 +165,7 @@ public class GunWeapon : MonoBehaviour
     private float disabledAt = -1f;
     private int fireHash, reloadHash;
     private readonly RaycastHit[] hits = new RaycastHit[16];
+    private static readonly Dictionary<Health, float> damageBuffer = new Dictionary<Health, float>();
 
     // 반동 (이전 프레임에 더한 값을 빼고 새 값을 더함 → Inspector에서 위치를 바꿔도 유지됨)
     private float recoilPos, recoilRot;
@@ -386,15 +395,25 @@ public class GunWeapon : MonoBehaviour
             flashOffTime = Time.time + flashDuration;
         }
 
-        // 히트스캔 (산탄이면 여러 발)
+        // 히트스캔 (산탄이면 여러 발). 피해는 대상별로 합쳐서 한 번만 보냄 (네트워크 메시지 절약)
         Vector3 firstPoint = Vector3.zero;
         Health firstHealth = null;
+        var fxPoints = new Vector3[pelletCount];
+        var fxNormals = new Vector3[pelletCount];
+        var fxHits = new bool[pelletCount];
+        damageBuffer.Clear();
         for (int i = 0; i < pelletCount; i++)
         {
-            Health h = Shoot(out Vector3 point);
+            Health h = Shoot(out Vector3 point, out Vector3 normal, out bool didHit);
+            fxPoints[i] = point;
+            fxNormals[i] = normal;
+            fxHits[i] = didHit;
             if (i == 0) { firstPoint = point; firstHealth = h; }
-            if (h != null) h.TakeDamage(damage, owner.gameObject);
+            if (h != null) damageBuffer[h] = (damageBuffer.TryGetValue(h, out float d) ? d : 0f) + damage;
         }
+        foreach (var kv in damageBuffer)
+            if (kv.Key != null) kv.Key.TakeDamage(kv.Value, owner.gameObject);
+        damageBuffer.Clear();
 
         // 총소리 → 소나 / 마네킹 기록
         Vector3 shooterPos = owner.position;
@@ -404,6 +423,7 @@ public class GunWeapon : MonoBehaviour
             mannequinSpawner.RecordShot(shooterPos, owner.forward);
 
         OnFired?.Invoke(firstPoint, firstHealth);
+        OnShotFx?.Invoke(this, fxPoints, fxNormals, fxHits);
         return true;
     }
 
@@ -427,7 +447,7 @@ public class GunWeapon : MonoBehaviour
         }
     }
 
-    private Health Shoot(out Vector3 hitPoint)
+    private Health Shoot(out Vector3 hitPoint, out Vector3 hitNormal, out bool didHit)
     {
         Transform cam = aimCamera != null ? aimCamera.transform : transform;
         Vector3 origin = cam.position;
@@ -460,13 +480,38 @@ public class GunWeapon : MonoBehaviour
             }
         }
 
+        hitNormal = bestNormal;
+        didHit = bestCol != null;
+
         // 피격 이펙트 / 빔
-        SpawnImpact(hitPoint, bestNormal, bestCol != null);
+        SpawnImpact(hitPoint, bestNormal, didHit);
 
         if (debugDrawRay)
             Debug.DrawLine(origin, hitPoint, bestCol != null ? Color.red : Color.yellow, 1f);
 
         return bestCol != null ? bestCol.GetComponentInParent<Health>() : null;
+    }
+
+    /// <summary>
+    /// 다른 플레이어가 쏜 총의 연출만 재생 (판정/탄약/반동 없음). PlayerNetworkCombat이 호출.
+    /// 소리는 쏜 사람 위치에서 3D로 들림 (PlayerNetworkSetup이 다른 플레이어 AudioSource를 3D로 설정)
+    /// </summary>
+    public void PlayRemoteShot(Vector3[] points, Vector3[] normals, bool[] hitFlags)
+    {
+        if (fireClip != null && audioSource != null && audioSource.isActiveAndEnabled)
+        {
+            audioSource.spatialBlend = 1f;   // 원격 총소리는 3D (Awake가 0으로 되돌릴 수 있어 매번 지정)
+            audioSource.pitch = firePitch;
+            audioSource.PlayOneShot(fireClip, volume);
+        }
+
+        if (points == null) return;
+        for (int i = 0; i < points.Length; i++)
+        {
+            Vector3 n = normals != null && i < normals.Length ? normals[i] : Vector3.up;
+            bool h = hitFlags != null && i < hitFlags.Length && hitFlags[i];
+            SpawnImpact(points[i], n, h);
+        }
     }
 
     /// <summary>총구 위치 (Muzzle Point가 없으면 Flash Local Offset)</summary>

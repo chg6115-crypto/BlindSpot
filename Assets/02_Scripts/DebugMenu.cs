@@ -85,8 +85,10 @@ public class DebugMenu : MonoBehaviour
         savedAmbient = RenderSettings.ambientLight;
         TrapBase.DebugShowAll = false;
         DecalBlink.DebugForceOn = false;
-    }
 
+        // 멀티 플레이 중에는 디버그 기능 끔 (싱글 / 에디터에서 Warehouse 바로 실행 시에는 켜짐)
+        //if (LobbyManager.IsMultiplayer) enabled = false;
+    }
     private void OnDisable()
     {
         if (brightOn) SetBright(false);   // Play 종료 시 환경광 복구

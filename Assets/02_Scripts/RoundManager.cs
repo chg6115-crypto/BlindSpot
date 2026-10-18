@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
 
 /// <summary>
@@ -18,6 +20,10 @@ using UnityEngine;
 /// 스포트라이트는 Default(바닥) + LocalPlayer(내 몸)만 비추게 설정 → 마네킹·다른 플레이어는 안 비춤.
 ///
 /// OnPlayStart(GO 순간) 이벤트: 1인칭 연출 등 연결용.
+///
+/// [네트워크 4단계] 플레이어는 씬에 미리 두지 않고 NetworkPlayerSpawner가 스폰한다.
+/// 내 플레이어가 스폰되면 PlayerNetworkSetup이 SetLocalPlayer()를 호출 → 그때 경기 시작.
+/// (지금은 각자 자기 RoundManager를 돌림. 서버 주도 라운드는 6단계에서)
 /// </summary>
 [DefaultExecutionOrder(50)]
 public class RoundManager : MonoBehaviour
@@ -57,7 +63,7 @@ public class RoundManager : MonoBehaviour
 
     [Header("플레이어")]
     [SerializeField] private Transform[] spawnPoints;
-    [Tooltip("비워두면 Player 태그로 검색")]
+    [Tooltip("비워두면 스폰된 내 플레이어가 자동 등록됨 (PlayerNetworkSetup)")]
     [SerializeField] private Transform localPlayer;
     [Tooltip("카운트다운·사망·라운드 종료 중 꺼둘 컴포넌트. 비워두면 FirstPersonController, vThirdPersonInput, SonarSkill 자동 검색")]
     [SerializeField] private Behaviour[] freezeComponents;
@@ -105,24 +111,46 @@ public class RoundManager : MonoBehaviour
 
         if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
         if (trapSpawner == null) trapSpawner = FindAnyObjectByType<TrapSpawner>();
-        if (localPlayer == null)
+
+        // Inspector에 직접 넣어둔 플레이어가 있으면 바로 등록 (예전 방식 호환)
+        if (localPlayer != null) SetLocalPlayer(localPlayer);
+
+        // 스포트라이트: Inspector의 Intensity를 최대 밝기로 쓰고 처음엔 꺼둠
+        if (introSpotlight != null)
         {
-            var p = GameObject.FindWithTag("Player");
-            if (p != null) localPlayer = p.transform;
+            spotMaxIntensity = introSpotlight.intensity;
+            introSpotlight.enabled = false;
         }
+    }
 
-        if (localPlayer != null)
-        {
-            localDecal = localPlayer.GetComponentInChildren<DecalBlink>();
+    private IEnumerator Start()
+    {
+        yield return null;   // 스포너들이 NavMesh 정보를 준비한 다음 시작
 
-            // 내 캐릭터에만 LocalPlayer 렌더링 레이어 추가 → 스포트라이트가 나만 비춤
-            uint bit = 1u << localPlayerRenderingLayer;
-            foreach (var r in localPlayer.GetComponentsInChildren<Renderer>(true))
-                r.renderingLayerMask |= bit;
-        }
+        // 내 플레이어가 스폰될 때까지 대기 (네트워크 스폰은 씬 로드보다 늦게 옴)
+        while (localPlayer == null) yield return null;
 
-        // Freeze Components가 비어 있으면 플레이어에서 자동으로 찾기
-        if ((freezeComponents == null || freezeComponents.Length == 0) && localPlayer != null)
+        if (autoStart) StartMatch();
+    }
+
+    /// <summary>
+    /// 내 플레이어 등록. PlayerNetworkSetup이 스폰 직후 호출.
+    /// 데칼 / 스포트라이트 렌더링 레이어 / Freeze 대상 설정.
+    /// </summary>
+    public void SetLocalPlayer(Transform player)
+    {
+        if (player == null) return;
+        localPlayer = player;
+
+        localDecal = localPlayer.GetComponentInChildren<DecalBlink>();
+
+        // 내 캐릭터에만 LocalPlayer 렌더링 레이어 추가 → 스포트라이트가 나만 비춤
+        uint bit = 1u << localPlayerRenderingLayer;
+        foreach (var r in localPlayer.GetComponentsInChildren<Renderer>(true))
+            r.renderingLayerMask |= bit;
+
+        // Freeze Components가 비어 있거나 (씬 플레이어를 지워서) 전부 끊겼으면 자동으로 찾기
+        if (freezeComponents == null || freezeComponents.All(c => c == null))
         {
             var list = new List<Behaviour>();
 
@@ -141,18 +169,8 @@ public class RoundManager : MonoBehaviour
             Debug.Log($"[RoundManager] Freeze Components 자동 설정: {list.Count}개", this);
         }
 
-        // 스포트라이트: Inspector의 Intensity를 최대 밝기로 쓰고 처음엔 꺼둠
-        if (introSpotlight != null)
-        {
-            spotMaxIntensity = introSpotlight.intensity;
-            introSpotlight.enabled = false;
-        }
-    }
-
-    private IEnumerator Start()
-    {
-        yield return null;   // 스포너들이 NavMesh 정보를 준비한 다음 시작
-        if (autoStart) StartMatch();
+        // 이미 경기 중이면 현재 상태에 맞춰 정지/해제
+        if (CurrentState != State.Idle) SetFrozen(CurrentState != State.Playing);
     }
 
     private void OnDestroy()
@@ -377,15 +395,29 @@ public class RoundManager : MonoBehaviour
     {
         if (localPlayer == null || spawnPoints == null) return;
 
-        var points = spawnPoints.Where(s => s != null).OrderBy(_ => UnityEngine.Random.value).ToList();
-        if (points.Count == 0)
+        var valid = spawnPoints.Where(s => s != null).ToList();
+        if (valid.Count == 0)
         {
             Debug.LogWarning("[RoundManager] Spawn Points가 비어 있습니다.", this);
             return;
         }
 
-        Teleport(localPlayer, points[0]);
-        // 멀티플레이 시 다른 플레이어는 points[1], points[2] ... 순서로 사용
+        Transform point;
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsListening && !LobbyManager.IsSinglePlayer)
+        {
+            // 멀티: 각자 자기 RoundManager를 돌리므로 겹치지 않게 클라이언트 번호로 자리 고정
+            // (호스트 0번, 다음 참가자 1번 ...). 라운드마다 시작 칸이 한 칸씩 밀려 위치가 바뀜
+            int slot = (int)(nm.LocalClientId % (ulong)valid.Count);
+            point = valid[(slot + CurrentRound - 1) % valid.Count];
+        }
+        else
+        {
+            // 싱글 / 오프라인: 무작위
+            point = valid[UnityEngine.Random.Range(0, valid.Count)];
+        }
+
+        Teleport(localPlayer, point);
     }
 
     private static void Teleport(Transform target, Transform point)
@@ -406,7 +438,12 @@ public class RoundManager : MonoBehaviour
             rb.rotation = rot;
         }
 
-        target.SetPositionAndRotation(pos, rot);
+        // 네트워크 플레이어: Teleport로 옮겨야 다른 사람 화면에서 미끄러지듯 이동하지 않음
+        var nt = target.GetComponent<NetworkTransform>();
+        if (nt != null && nt.IsSpawned && nt.CanCommitToTransform)
+            nt.Teleport(pos, rot, target.localScale);
+        else
+            target.SetPositionAndRotation(pos, rot);
         Physics.SyncTransforms();
 
         if (cc != null) cc.enabled = true;

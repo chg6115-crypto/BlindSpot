@@ -11,7 +11,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class LoadoutSelector : MonoBehaviour
 {
-    [Tooltip("비우면 Player 태그 오브젝트에서 자동 검색")]
+    [Tooltip("비우면 스폰된 내 플레이어(PlayerNetworkSetup.Local)에서 자동 검색")]
     [SerializeField] private WeaponSwitcher switcher;
     [Tooltip("첫 라운드 기본 무기 슬롯 (0부터)")]
     [SerializeField, Min(0)] private int defaultIndex = 0;
@@ -34,18 +34,22 @@ public class LoadoutSelector : MonoBehaviour
 
     private GUIStyle style;
 
-    private void Start()
+    private System.Collections.IEnumerator Start()
     {
-        if (switcher == null)
+        // 내 플레이어는 네트워크로 나중에 스폰되므로 찾을 때까지 기다림 (최대 30초)
+        float giveUpAt = Time.time + 30f;
+        while (switcher == null || switcher.Count == 0)
         {
-            var player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null) switcher = player.GetComponentInChildren<WeaponSwitcher>(true);
-        }
-        if (switcher == null || switcher.Count == 0)
-        {
-            Debug.LogWarning("[LoadoutSelector] WeaponSwitcher를 찾지 못했습니다.", this);
-            enabled = false;
-            return;
+            if (Time.time > giveUpAt)
+            {
+                Debug.LogWarning("[LoadoutSelector] WeaponSwitcher를 찾지 못했습니다.", this);
+                enabled = false;
+                yield break;
+            }
+
+            var local = PlayerNetworkSetup.Local;
+            if (local != null) switcher = local.GetComponentInChildren<WeaponSwitcher>(true);
+            yield return null;
         }
 
         SelectedIndex = Mathf.Clamp(defaultIndex, 0, switcher.Count - 1);
@@ -105,7 +109,7 @@ public class LoadoutSelector : MonoBehaviour
 
     private void Update()
     {
-        if (!IsSelecting) return;
+        if (!IsSelecting || switcher == null) return;
         var kb = Keyboard.current;
         if (kb == null) return;
 

@@ -9,6 +9,11 @@ using UnityEngine;
 ///  - 로컬 플레이어(Player 태그)는 ScoreManager의 LocalPlayerId를 사용
 ///  - 디버그 봇은 SetupAsBot()으로 플레이어 등록
 /// 공격하는 쪽은 TakeDamage(피해량, 공격자 GameObject)만 호출하면 됨 (근접, 총 공통).
+///
+/// [네트워크 5단계] 같은 오브젝트에 PlayerNetworkCombat이 있고 스폰된 상태면 (= 네트워크 플레이어)
+///  - TakeDamage → 호스트에 전달, 체력은 호스트가 바꾼 값을 받아서 표시
+///  - 사망 / 부활 / 킬 기록도 PlayerNetworkCombat이 호출 (NetDie / NetRevive)
+///  - 마네킹, 디버그 봇은 지금처럼 각자 컴퓨터에서 처리 (6단계에서 호스트로 옮김)
 /// </summary>
 public class Health : MonoBehaviour
 {
@@ -44,6 +49,8 @@ public class Health : MonoBehaviour
     public bool IsLocal { get; private set; }
     public bool IsDead { get; private set; }
     public bool IsMannequin => CompareTag(mannequinTag);
+    /// <summary>네트워크 플레이어인지 (체력을 호스트가 관리)</summary>
+    public bool IsNetworked => net != null && net.IsSpawned;
 
     /// <summary>맞았을 때 (대상, 피해량, 공격자) - 마네킹 포함</summary>
     public event Action<Health, float, GameObject> OnDamaged;
@@ -51,6 +58,7 @@ public class Health : MonoBehaviour
     public event Action<Health, GameObject> OnDied;
 
     private DecalBlink decal;
+    private PlayerNetworkCombat net;
     private Renderer[] renderers;
     private Collider[] colliders;
     private GUIStyle hudStyle;
@@ -63,11 +71,13 @@ public class Health : MonoBehaviour
         decal = GetComponentInChildren<DecalBlink>();
         renderers = GetComponentsInChildren<Renderer>(true);
         colliders = GetComponentsInChildren<Collider>(true);
+        net = GetComponent<PlayerNetworkCombat>();
     }
 
     private void Start()
     {
-        if (CompareTag("Player") && ScoreManager.Instance != null)
+        // 네트워크 플레이어는 PlayerNetworkCombat이 AssignNetworkPlayer()로 설정함
+        if (!IsNetworked && CompareTag("Player") && ScoreManager.Instance != null)
         {
             PlayerId = ScoreManager.Instance.LocalPlayerId;
             IsLocal = true;
@@ -115,6 +125,13 @@ public class Health : MonoBehaviour
             return;
         }
 
+        // 네트워크 플레이어: 호스트에 보내고 끝 (체력 변화는 호스트에서 돌아옴)
+        if (IsNetworked)
+        {
+            net.RequestDamage(amount, attacker);
+            return;
+        }
+
         // 플레이어: 라운드 진행 중에만 피해
         var rm = RoundManager.Instance;
         if (rm != null && rm.CurrentState != RoundManager.State.Playing) return;
@@ -159,8 +176,45 @@ public class Health : MonoBehaviour
 
     private void HandleRoundStart(int round)
     {
-        if (PlayerId >= 0) Revive();
+        // 네트워크 플레이어는 호스트가 체력을 되돌리면 NetRevive로 부활
+        if (PlayerId >= 0 && !IsNetworked) Revive();
     }
+
+    // ───────── 네트워크 (PlayerNetworkCombat이 호출) ─────────
+
+    /// <summary>점수판 id / 내 플레이어 여부 설정</summary>
+    public void AssignNetworkPlayer(int id, bool isLocal)
+    {
+        PlayerId = id;
+        IsLocal = isLocal;
+    }
+
+    /// <summary>호스트가 정한 체력 반영. 줄었으면 피격 연출 (공격자는 모름)</summary>
+    public void SetNetworkHealth(float value, bool notify)
+    {
+        float old = Current;
+        Current = Mathf.Clamp(value, 0f, maxHealth);
+        if (notify && Current < old)
+        {
+            if (flashPlayerDecalOnHit) FlashDecal();
+            OnDamaged?.Invoke(this, old - Current, null);
+        }
+    }
+
+    /// <summary>사망 처리 (킬 기록은 PlayerNetworkCombat이 따로 보고)</summary>
+    public void NetDie(GameObject attacker)
+    {
+        if (IsDead) return;
+        IsDead = true;
+        Current = 0f;
+        OnDied?.Invoke(this, attacker);
+
+        // 내 몸은 남겨둠 (RoundManager가 조작 정지), 다른 플레이어는 숨김
+        if (!IsLocal) SetBodyActive(false);
+    }
+
+    /// <summary>부활 (호스트가 체력을 되돌렸을 때)</summary>
+    public void NetRevive() => Revive();
 
     // ───────── 연출 ─────────
 

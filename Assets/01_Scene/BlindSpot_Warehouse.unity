@@ -23,7 +23,7 @@ RenderSettings:
   m_AmbientSkyColor: {r: 0, g: 0, b: 0, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
-  m_AmbientIntensity: 0.01
+  m_AmbientIntensity: 0
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0, g: 0, b: 0, a: 1}
   m_SkyboxMaterial: {fileID: 2100000, guid: fc6ff007bfc998f4080e17148d863362, type: 2}
@@ -2703,63 +2703,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4000011515750920, guid: bd78ceace8eb93d42a9ee0bde8dbc598, type: 3}
   m_PrefabInstance: {fileID: 437900929}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &443519891
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: -0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 1321515402164774965, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 8224617769351544002, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-      propertyPath: m_Name
-      value: Player_FPS
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
 --- !u!1001 &452413756
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4348,11 +4291,6 @@ PrefabInstance:
 Transform:
   m_CorrespondingSourceObject: {fileID: 5022016518659280611, guid: b49508be57bea5a4b82e235f3243e863, type: 3}
   m_PrefabInstance: {fileID: 198569586154012066}
-  m_PrefabAsset: {fileID: 0}
---- !u!4 &871553791 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 7410747236145631392, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
-  m_PrefabInstance: {fileID: 443519891}
   m_PrefabAsset: {fileID: 0}
 --- !u!1001 &885690658
 PrefabInstance:
@@ -7063,6 +7001,53 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1566203544}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &1570683339
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1570683340}
+  - component: {fileID: 1570683341}
+  m_Layer: 0
+  m_Name: Skybox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1570683340
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570683339}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1751390925}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1570683341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570683339}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10f2fd7a3100c7c40be17bdbe711beaa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkyboxRotator
+  degreesPerSecond: 1
+  startAngle: 0
+  useUnscaledTime: 0
 --- !u!4 &1580588827 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 4940169344458020, guid: 707a966d8df1bd14fa9e9553df82a65a, type: 3}
@@ -7164,7 +7149,7 @@ MonoBehaviour:
   m_StreamingVersion: 20241001
   m_LegacyPriority: 0
   Target:
-    TrackingTarget: {fileID: 871553791}
+    TrackingTarget: {fileID: 0}
     LookAtTarget: {fileID: 0}
     CustomLookAtTarget: 0
   Lens:
@@ -7693,6 +7678,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1751390925}
+  - component: {fileID: 1751390926}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -7722,8 +7708,23 @@ Transform:
   - {fileID: 138704592}
   - {fileID: 1862935631}
   - {fileID: 355863290}
+  - {fileID: 1570683340}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1751390926
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1751390924}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5fc89d6d3273afb4493d70fd646d7709, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::NetworkPlayerSpawner
+  playerPrefab: {fileID: 8224617769351544002, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
+  spawnPoints: []
 --- !u!1001 &1789352306
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9246,7 +9247,6 @@ SceneRoots:
   - {fileID: 1414218747}
   - {fileID: 1920206077}
   - {fileID: 1725576105}
-  - {fileID: 443519891}
   - {fileID: 1597793338}
   - {fileID: 885690658}
   - {fileID: 297936137}

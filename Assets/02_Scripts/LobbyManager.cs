@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TMPro;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Multiplayer;
@@ -10,52 +13,121 @@ using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 /// <summary>
-/// 로비: 방 만들기 / 코드로 참가 / 방장이 시작 → 게임 씬으로 모두 이동.
-/// Lobby 씬의 빈 오브젝트에 붙인다. 같은 씬에 NetworkManager(Enable Scene Management 체크)가 있어야 함.
+/// 로비 (Lobby_New 씬).
+///  - 패널 5개(Main / Create / RoomList / Room / Settings)를 켜고 끄는 방식으로 화면 전환
+///  - 모든 버튼 클릭은 코드에서 연결 (Inspector의 On Click() 설정 불필요)
+///  - 싱글 플레이: 서버/로그인 없이 내 PC에서 Host로 바로 시작 (인터넷 불필요)
+///  - 멀티: 닉네임 → 방 만들기(공개/비공개) / 방 목록 / 코드 참가 → 방장 START → 전원 게임 씬 이동
 /// </summary>
 public class LobbyManager : MonoBehaviour
 {
+    public static string LocalNickname { get; private set; } = "";
+    /// <summary>true면 싱글(오프라인) 플레이, false면 멀티. 기본값 true (Warehouse를 에디터에서 바로 실행해도 싱글 취급)</summary>
+    public static bool IsSinglePlayer { get; private set; } = true;
+    /// <summary>로비를 거쳐 멀티로 들어갔는지 (디버그 메뉴 제한 등에 사용)</summary>
+    public static bool IsMultiplayer => !IsSinglePlayer;
+
+    const string NickKey = "nickname";
+    const string NickProperty = "nick";
+    const string PrivateProperty = "priv";
+    static readonly Regex NickRule = new Regex("^[A-Za-z0-9]{4,12}$");
+
     [Header("설정")]
     [SerializeField] private string gameSceneName = "BlindSpot_Warehouse";
     [SerializeField, Range(2, 8)] private int maxPlayers = 4;
     [Tooltip("혼자서도 시작 가능 (테스트용)")]
     [SerializeField] private bool allowSoloStart = true;
+    [Tooltip("방 목록 화면에서 자동 새로고침 간격(초). 0이면 끔")]
+    [SerializeField, Min(0f)] private float autoRefreshInterval = 5f;
 
-    [Header("UI - 메뉴")]
-    [SerializeField] private GameObject menuPanel;
-    [SerializeField] private Button createButton;
-    [SerializeField] private TMP_InputField codeInput;
-    [SerializeField] private Button joinButton;
-
-    [Header("UI - 방")]
+    [Header("패널")]
+    [SerializeField] private GameObject mainPanel;
+    [SerializeField] private GameObject createPanel;
+    [SerializeField] private GameObject roomListPanel;
     [SerializeField] private GameObject roomPanel;
+    [SerializeField] private GameObject settingsPanel;
+
+    [Header("Main")]
+    [SerializeField] private TMP_InputField nicknameInput;
+    [SerializeField] private Button singleButton;
+    [SerializeField] private Button createRoomButton;
+    [SerializeField] private Button findRoomButton;
+    [SerializeField] private Button settingsButton;
+    [SerializeField] private Button quitButton;
+
+    [Header("Create")]
+    [SerializeField] private TMP_Text createRoomNameText;
+    [SerializeField] private Toggle privateToggle;
+    [SerializeField] private Button createButton;
+    [SerializeField] private Button createBackButton;
+
+    [Header("Room List")]
+    [SerializeField] private Transform roomListContent;
+    [SerializeField] private RoomListItem roomListItemPrefab;
+    [SerializeField] private TMP_InputField codeInput;
+    [SerializeField] private Button joinCodeButton;
+    [SerializeField] private Button refreshButton;
+    [SerializeField] private Button roomListBackButton;
+
+    [Header("Room")]
+    [SerializeField] private TMP_Text roomNameText;
     [SerializeField] private TMP_Text roomCodeText;
+    [SerializeField] private TMP_Text roomPrivacyText;
+    [SerializeField] private TMP_Text playersCountText;
     [SerializeField] private TMP_Text playersText;
     [SerializeField] private Button startButton;
     [SerializeField] private Button leaveButton;
 
-    [Header("UI - 상태")]
+    [Header("Settings")]
+    [SerializeField] private Button settingsBackButton;
+
+    [Header("상태 메시지")]
     [SerializeField] private TMP_Text statusText;
 
     private ISession session;
     private bool busy;
+    private bool ready;
+    private float refreshTimer;
+    private readonly List<RoomListItem> listItems = new List<RoomListItem>();
+
+    // ───────── 시작 ─────────
 
     private async void Start()
     {
-        ShowMenu();
-        SetMenuInteractable(false);
+        if (nicknameInput != null)
+        {
+            nicknameInput.characterLimit = 12;
+            nicknameInput.contentType = TMP_InputField.ContentType.Alphanumeric;
+            nicknameInput.text = PlayerPrefs.GetString(NickKey, "");
+        }
 
-        createButton.onClick.AddListener(() => _ = CreateRoom());
-        joinButton.onClick.AddListener(() => _ = JoinRoom());
-        startButton.onClick.AddListener(() => _ = StartGame());
-        leaveButton.onClick.AddListener(() => _ = LeaveRoom());
+        Bind(singleButton, StartSingle);
+        Bind(createRoomButton, OpenCreate);
+        Bind(findRoomButton, OpenRoomList);
+        Bind(settingsButton, () => ShowPanel(settingsPanel));
+        Bind(quitButton, Quit);
+
+        Bind(createButton, () => _ = CreateRoom());
+        Bind(createBackButton, () => ShowPanel(mainPanel));
+
+        Bind(joinCodeButton, () => _ = JoinByCode());
+        Bind(refreshButton, () => _ = RefreshRoomList());
+        Bind(roomListBackButton, () => ShowPanel(mainPanel));
+
+        Bind(startButton, () => _ = StartGame());
+        Bind(leaveButton, () => _ = LeaveRoom());
+
+        Bind(settingsBackButton, () => ShowPanel(mainPanel));
+
+        ShowPanel(mainPanel);
+        SetOnlineButtons(false);
 
         try
         {
-            SetStatus("서버 연결 중...");
+            SetStatus("Connecting...");
             if (UnityServices.State != ServicesInitializationState.Initialized)
             {
-                // 같은 PC에서 여러 개 띄워 테스트할 때 서로 다른 플레이어로 인식되도록 프로필을 랜덤으로
+                // 같은 PC에서 여러 창으로 테스트할 때 서로 다른 플레이어로 인식되도록 랜덤 프로필
                 var options = new InitializationOptions();
                 options.SetProfile("p" + UnityEngine.Random.Range(0, 1000000));
                 await UnityServices.InitializeAsync(options);
@@ -63,12 +135,13 @@ public class LobbyManager : MonoBehaviour
             if (!AuthenticationService.Instance.IsSignedIn)
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
+            ready = true;
             SetStatus("");
-            SetMenuInteractable(true);
+            SetOnlineButtons(true);
         }
         catch (Exception e)
         {
-            SetStatus("연결 실패: " + e.Message);
+            SetStatus("Offline - single play only");
             Debug.LogException(e);
         }
     }
@@ -78,77 +151,278 @@ public class LobbyManager : MonoBehaviour
         Unsubscribe();
     }
 
-    // ───────── 방 만들기 / 참가 / 나가기 ─────────
-
-    private async Task CreateRoom()
+    private void Update()
     {
-        if (busy) return;
-        busy = true;
-        SetMenuInteractable(false);
-        SetStatus("방 만드는 중...");
+        // 방 목록 화면이 열려 있으면 주기적으로 새로고침
+        if (!ready || busy || session != null || autoRefreshInterval <= 0f) return;
+        if (roomListPanel == null || !roomListPanel.activeInHierarchy) return;
 
-        try
+        refreshTimer -= Time.deltaTime;
+        if (refreshTimer <= 0f)
         {
-            var options = new SessionOptions
-            {
-                MaxPlayers = maxPlayers,
-                IsPrivate = true          // 목록에는 안 보이고 코드로만 참가
-            }.WithRelayNetwork();         // 다른 네트워크끼리도 연결 + 방장이 Host로 자동 시작
-
-            session = await MultiplayerService.Instance.CreateSessionAsync(options);
-            EnterRoom();
+            refreshTimer = autoRefreshInterval;
+            _ = RefreshRoomList();
         }
-        catch (Exception e)
-        {
-            SetStatus("방 만들기 실패: " + e.Message);
-            Debug.LogException(e);
-            SetMenuInteractable(true);
-        }
-        busy = false;
     }
 
-    private async Task JoinRoom()
+    private static void Bind(Button b, UnityEngine.Events.UnityAction action)
     {
-        if (busy) return;
-        string code = codeInput.text.Trim().ToUpperInvariant();
-        if (string.IsNullOrEmpty(code))
+        if (b != null) b.onClick.AddListener(action);
+    }
+
+    // ───────── 화면 전환 ─────────
+
+    private void ShowPanel(GameObject target)
+    {
+        foreach (var p in new[] { mainPanel, createPanel, roomListPanel, roomPanel, settingsPanel })
+            if (p != null) p.SetActive(p == target);
+    }
+
+    private void OpenCreate()
+    {
+        if (!ready || busy) return;
+        if (!ValidateNickname()) return;
+        if (createRoomNameText != null) createRoomNameText.text = LocalNickname;
+        if (privateToggle != null) privateToggle.isOn = false;
+        SetStatus("");
+        ShowPanel(createPanel);
+    }
+
+    private void OpenRoomList()
+    {
+        if (!ready || busy) return;
+        SetStatus("");
+        ShowPanel(roomListPanel);
+        refreshTimer = autoRefreshInterval;
+        _ = RefreshRoomList();   // 열자마자 한 번 새로고침
+    }
+
+    private void Quit()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    // ───────── 닉네임 ─────────
+
+    /// <summary>닉네임 검사 (4~12자, 영문/숫자). 통과하면 저장</summary>
+    private bool ValidateNickname()
+    {
+        string nick = nicknameInput != null ? nicknameInput.text.Trim() : "";
+        if (!NickRule.IsMatch(nick))
         {
-            SetStatus("방 코드를 입력하세요");
+            SetStatus("Nickname: 4-12 letters or numbers (A-Z, 0-9)");
+            return false;
+        }
+        LocalNickname = nick;
+        PlayerPrefs.SetString(NickKey, nick);
+        PlayerPrefs.Save();
+        return true;
+    }
+
+    private Dictionary<string, PlayerProperty> MyProperties()
+    {
+        return new Dictionary<string, PlayerProperty>
+        {
+            { NickProperty, new PlayerProperty(LocalNickname, VisibilityPropertyOptions.Member) }
+        };
+    }
+
+    // ───────── 싱글 플레이 ─────────
+
+    /// <summary>
+    /// 서버/로그인 없이 내 PC에서 Host로 시작 → 게임 씬 이동.
+    /// 멀티와 같은 경로(NetworkManager)를 쓰므로 나중에 네트워크 플레이어로 바꿔도 그대로 동작.
+    /// </summary>
+    private void StartSingle()
+    {
+        if (busy || session != null) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null) { SetStatus("NetworkManager missing"); return; }
+
+        busy = true;
+        SetAllButtons(false);
+
+        // 닉네임은 규칙에 맞으면 사용, 아니면 기본값
+        string nick = nicknameInput != null ? nicknameInput.text.Trim() : "";
+        LocalNickname = NickRule.IsMatch(nick) ? nick : "Player";
+        IsSinglePlayer = true;
+
+        // Relay 설정이 남아 있어도 로컬 직접 연결로 덮어씀
+        var utp = nm.GetComponent<UnityTransport>();
+        if (utp != null) utp.SetConnectionData("127.0.0.1", 7777);
+
+        if (nm.IsListening) nm.Shutdown();
+        if (!nm.StartHost())
+        {
+            SetStatus("Single start failed");
+            busy = false;
+            SetAllButtons(true);
+            SetOnlineButtons(ready);
             return;
         }
 
+        SetStatus("Starting single play...");
+        nm.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+    }
+
+    // ───────── 방 만들기 ─────────
+
+    private async Task CreateRoom()
+    {
+        if (busy || !ready || !ValidateNickname()) return;
         busy = true;
-        SetMenuInteractable(false);
-        SetStatus("참가하는 중...");
+        SetAllButtons(false);
+        SetStatus("Creating room...");
 
         try
         {
-            session = await MultiplayerService.Instance.JoinSessionByCodeAsync(code);
+            bool isPrivate = privateToggle != null && privateToggle.isOn;
+            var options = new SessionOptions
+            {
+                Name = LocalNickname,          // 방 제목 = 닉네임
+                MaxPlayers = maxPlayers,
+                IsPrivate = isPrivate,         // 비공개면 목록에 안 보이고 코드로만 참가
+                PlayerProperties = MyProperties(),
+                SessionProperties = new Dictionary<string, SessionProperty>
+                {
+                    { PrivateProperty, new SessionProperty(isPrivate ? "1" : "0", VisibilityPropertyOptions.Member) }
+                }
+            }.WithRelayNetwork();              // 방장이 Host로 자동 시작, 다른 네트워크끼리도 연결
+
+            session = await MultiplayerService.Instance.CreateSessionAsync(options);
+            IsSinglePlayer = false;
             EnterRoom();
         }
         catch (Exception e)
         {
-            SetStatus("참가 실패: " + e.Message);
+            SetStatus("Create failed: " + e.Message);
             Debug.LogException(e);
-            SetMenuInteractable(true);
         }
+        SetAllButtons(true);
+        SetOnlineButtons(ready);
         busy = false;
     }
+
+    // ───────── 방 목록 ─────────
+
+    private async Task RefreshRoomList()
+    {
+        if (busy || !ready || session != null) return;
+        busy = true;
+        if (refreshButton != null) refreshButton.interactable = false;
+
+        try
+        {
+            var results = await MultiplayerService.Instance.QuerySessionsAsync(new QuerySessionsOptions { Count = 20 });
+            ClearList();
+
+            foreach (var info in results.Sessions)
+            {
+                if (info.IsLocked || info.AvailableSlots <= 0) continue;   // 게임 중이거나 꽉 찬 방 제외
+
+                string id = info.Id;
+                int players = info.MaxPlayers - info.AvailableSlots;
+                var item = Instantiate(roomListItemPrefab, roomListContent);
+                item.Setup(string.IsNullOrEmpty(info.Name) ? "ROOM" : info.Name, players, info.MaxPlayers,
+                           () => _ = JoinById(id));
+                listItems.Add(item);
+            }
+
+            if (roomListPanel != null && roomListPanel.activeInHierarchy)
+                SetStatus(listItems.Count == 0 ? "No rooms. Create one!" : "");
+        }
+        catch (Exception e)
+        {
+            SetStatus("Refresh failed: " + e.Message);
+            Debug.LogException(e);
+        }
+
+        if (refreshButton != null) refreshButton.interactable = true;
+        busy = false;
+    }
+
+    private void ClearList()
+    {
+        foreach (var item in listItems)
+            if (item != null) Destroy(item.gameObject);
+        listItems.Clear();
+    }
+
+    // ───────── 참가 ─────────
+
+    private async Task JoinById(string sessionId)
+    {
+        if (busy || !ready || !ValidateNickname()) return;
+        await Join(() => MultiplayerService.Instance.JoinSessionByIdAsync(
+            sessionId, new JoinSessionOptions { PlayerProperties = MyProperties() }));
+    }
+
+    private async Task JoinByCode()
+    {
+        if (busy || !ready || !ValidateNickname()) return;
+        string code = codeInput != null ? codeInput.text.Trim().ToUpperInvariant() : "";
+        if (string.IsNullOrEmpty(code))
+        {
+            SetStatus("Enter a room code");
+            return;
+        }
+        await Join(() => MultiplayerService.Instance.JoinSessionByCodeAsync(
+            code, new JoinSessionOptions { PlayerProperties = MyProperties() }));
+    }
+
+    private async Task Join(Func<Task<ISession>> joinCall)
+    {
+        busy = true;
+        SetAllButtons(false);
+        SetStatus("Joining...");
+
+        try
+        {
+            session = await joinCall();
+            IsSinglePlayer = false;
+            EnterRoom();
+        }
+        catch (Exception e)
+        {
+            SetStatus("Join failed: " + e.Message);
+            Debug.LogException(e);
+        }
+        SetAllButtons(true);
+        SetOnlineButtons(ready);
+        busy = false;
+    }
+
+    // ───────── 나가기 ─────────
 
     private async Task LeaveRoom()
     {
         if (session == null) return;
+        if (leaveButton != null) leaveButton.interactable = false;
         Unsubscribe();
+
         try { await session.LeaveAsync(); }
         catch (Exception e) { Debug.LogException(e); }
 
+        BackToMenu("");
+    }
+
+    private void BackToMenu(string message)
+    {
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             NetworkManager.Singleton.Shutdown();
 
         session = null;
-        ShowMenu();
-        SetMenuInteractable(true);
-        SetStatus("");
+        IsSinglePlayer = true;
+        if (leaveButton != null) leaveButton.interactable = true;
+        SetAllButtons(true);
+        SetOnlineButtons(ready);
+        ShowPanel(mainPanel);
+        SetStatus(message);
     }
 
     // ───────── 게임 시작 (방장만) ─────────
@@ -156,17 +430,17 @@ public class LobbyManager : MonoBehaviour
     private async Task StartGame()
     {
         if (session == null || !session.IsHost) return;
-        startButton.interactable = false;
-        SetStatus("게임 시작...");
+        if (startButton != null) startButton.interactable = false;
+        SetStatus("Starting...");
 
-        // 게임 중에는 새로 못 들어오게 잠금
+        // 게임 중에는 새로 못 들어오게 잠금 (목록에서도 사라짐)
         try
         {
             var host = session.AsHost();
             host.IsLocked = true;
             await host.SavePropertiesAsync();
         }
-        catch (Exception e) { Debug.LogWarning("방 잠금 실패: " + e.Message); }
+        catch (Exception e) { Debug.LogWarning("Lock failed: " + e.Message); }
 
         // 서버(방장)가 씬을 바꾸면 접속한 모두가 같이 이동
         NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
@@ -179,9 +453,8 @@ public class LobbyManager : MonoBehaviour
         session.Changed += RefreshRoom;
         session.RemovedFromSession += OnRemovedFromSession;
 
-        menuPanel.SetActive(false);
-        roomPanel.SetActive(true);
-        roomCodeText.text = "방 코드: " + session.Code;
+        ClearList();
+        ShowPanel(roomPanel);
         SetStatus("");
         RefreshRoom();
     }
@@ -189,22 +462,54 @@ public class LobbyManager : MonoBehaviour
     private void RefreshRoom()
     {
         if (session == null) return;
-        playersText.text = $"인원 {session.PlayerCount} / {session.MaxPlayers}";
+
+        if (roomNameText != null) roomNameText.text = session.Name;
+        if (roomCodeText != null) roomCodeText.text = "CODE: " + session.Code;
+
+        if (roomPrivacyText != null)
+        {
+            bool isPrivate = session.Properties != null
+                             && session.Properties.TryGetValue(PrivateProperty, out var priv)
+                             && priv.Value == "1";
+            roomPrivacyText.text = isPrivate ? "PRIVATE" : "PUBLIC";
+        }
+
+        if (playersCountText != null)
+            playersCountText.text = $"PLAYERS {session.PlayerCount} / {session.MaxPlayers}";
+
+        if (playersText != null)
+        {
+            var sb = new System.Text.StringBuilder();
+            int shown = 0;
+            foreach (var p in session.Players)
+            {
+                string nick = p.Properties != null && p.Properties.TryGetValue(NickProperty, out var prop)
+                    ? prop.Value : "PLAYER";
+                bool isHostPlayer = p.Id == session.Host;
+                sb.Append(nick);
+                if (isHostPlayer) sb.Append("<pos=80%><color=#40E6F0><size=70%>HOST</size></color>");
+                sb.Append('\n');
+                shown++;
+            }
+            for (int i = shown; i < session.MaxPlayers; i++)
+                sb.Append("<color=#5A698C>- EMPTY -</color>\n");
+            playersText.text = sb.ToString();
+        }
 
         bool isHost = session.IsHost;
-        startButton.gameObject.SetActive(isHost);
-        startButton.interactable = isHost && (allowSoloStart || session.PlayerCount >= 2);
+        if (startButton != null)
+        {
+            startButton.gameObject.SetActive(isHost);
+            startButton.interactable = isHost && (allowSoloStart || session.PlayerCount >= 2);
+        }
 
-        if (!isHost) SetStatus("방장이 시작하길 기다리는 중...");
+        SetStatus(isHost ? "" : "Waiting for host to start...");
     }
 
     private void OnRemovedFromSession()
     {
         Unsubscribe();
-        session = null;
-        ShowMenu();
-        SetMenuInteractable(true);
-        SetStatus("방에서 나가졌습니다");
+        BackToMenu("Left the room");
     }
 
     private void Unsubscribe()
@@ -214,19 +519,25 @@ public class LobbyManager : MonoBehaviour
         session.RemovedFromSession -= OnRemovedFromSession;
     }
 
-    // ───────── UI 도우미 ─────────
+    // ───────── 공통 ─────────
 
-    private void ShowMenu()
+    /// <summary>서버 연결이 필요한 버튼 (방 만들기 / 찾기 / 참가)</summary>
+    private void SetOnlineButtons(bool on)
     {
-        menuPanel.SetActive(true);
-        roomPanel.SetActive(false);
+        foreach (var b in new[] { createRoomButton, findRoomButton, createButton, joinCodeButton, refreshButton })
+            if (b != null) b.interactable = on;
+        foreach (var item in listItems)
+            if (item != null) item.SetInteractable(on);
     }
 
-    private void SetMenuInteractable(bool on)
+    /// <summary>처리 중(busy)일 때 전체 버튼 잠금. 싱글/설정/종료 포함</summary>
+    private void SetAllButtons(bool on)
     {
-        createButton.interactable = on;
-        joinButton.interactable = on;
-        codeInput.interactable = on;
+        foreach (var b in new[] { singleButton, createRoomButton, findRoomButton, settingsButton, quitButton,
+                                  createButton, createBackButton, joinCodeButton, refreshButton, roomListBackButton })
+            if (b != null) b.interactable = on;
+        foreach (var item in listItems)
+            if (item != null) item.SetInteractable(on);
     }
 
     private void SetStatus(string msg)
