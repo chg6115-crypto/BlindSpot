@@ -23,7 +23,11 @@ using UnityEngine;
 ///
 /// [네트워크 4단계] 플레이어는 씬에 미리 두지 않고 NetworkPlayerSpawner가 스폰한다.
 /// 내 플레이어가 스폰되면 PlayerNetworkSetup이 SetLocalPlayer()를 호출 → 그때 경기 시작.
-/// (지금은 각자 자기 RoundManager를 돌림. 서버 주도 라운드는 6단계에서)
+///
+/// [네트워크 6단계] 멀티에서는 호스트만 라운드를 진행한다.
+///  - 호스트: 지금까지와 똑같이 진행 (마네킹·트랩 배치, 승패 판정). RoundNetworkSync가 각 단계를 참가자에게 알림
+///  - 참가자: 직접 진행하지 않고(IsFollower) 호스트 신호(NetBeginRound / NetBeginPlay / NetEndRound / NetEndMatch)를 따라감
+///  - 싱글 / 오프라인은 호스트와 같음
 /// </summary>
 [DefaultExecutionOrder(50)]
 public class RoundManager : MonoBehaviour
@@ -92,6 +96,16 @@ public class RoundManager : MonoBehaviour
     public IReadOnlyCollection<int> AliveIds => alive;
     public Transform[] SpawnPoints => spawnPoints;
 
+    /// <summary>멀티 참가자(호스트 아님) → 라운드를 직접 진행하지 않고 호스트 신호를 따라감</summary>
+    public bool IsFollower
+    {
+        get
+        {
+            var nm = NetworkManager.Singleton;
+            return nm != null && nm.IsListening && !nm.IsServer;
+        }
+    }
+
     private readonly HashSet<int> alive = new HashSet<int>();
     private readonly Dictionary<int, int> roundKills = new Dictionary<int, int>();
     private int participantCount;
@@ -128,7 +142,28 @@ public class RoundManager : MonoBehaviour
         yield return null;   // 스포너들이 NavMesh 정보를 준비한 다음 시작
 
         // 내 플레이어가 스폰될 때까지 대기 (네트워크 스폰은 씬 로드보다 늦게 옴)
-        while (localPlayer == null) yield return null;
+        // 스폰 순간 등록을 놓쳤어도 여기서 직접 찾아 등록
+        while (localPlayer == null)
+        {
+            var local = PlayerNetworkSetup.Local;
+            if (local != null) SetLocalPlayer(local.transform);
+            else yield return null;
+        }
+
+        // 참가자는 호스트의 라운드 시작 신호를 기다림
+        if (IsFollower) yield break;
+
+        // 호스트: 모든 참가자의 플레이어가 생성될 때까지 기다린 뒤 시작 (최대 15초)
+        //  → 늦게 로드된 참가자도 1라운드 무기 선택 / 카운트다운을 받음
+        var spawner = NetworkPlayerSpawner.Instance;
+        if (spawner != null && !spawner.AllPlayersSpawned)
+        {
+            banner = "WAITING FOR PLAYERS";
+            float giveUp = Time.unscaledTime + 15f;
+            while (!spawner.AllPlayersSpawned && Time.unscaledTime < giveUp) yield return null;
+            banner = "";
+            yield return new WaitForSeconds(0.5f);   // 참가자 쪽에 플레이어가 만들어질 시간
+        }
 
         if (autoStart) StartMatch();
     }
@@ -183,6 +218,7 @@ public class RoundManager : MonoBehaviour
     /// <summary>경기 처음부터 시작 (점수 초기화)</summary>
     public void StartMatch()
     {
+        if (IsFollower) return;   // 참가자는 호스트를 따라감
         if (matchRoutine != null) StopCoroutine(matchRoutine);
         SetSpotlight(0f);
         if (ScoreManager.Instance != null) ScoreManager.Instance.ResetScores();
@@ -192,6 +228,7 @@ public class RoundManager : MonoBehaviour
     /// <summary>진행 중인 라운드를 바로 종료 (디버그용)</summary>
     public void ForceEndRound()
     {
+        if (IsFollower) return;
         if (CurrentState == State.Playing) forceEnd = true;
     }
 
@@ -231,21 +268,25 @@ public class RoundManager : MonoBehaviour
         for (int r = 1; r <= totalRounds; r++)
         {
             CurrentRound = r;
-            yield return IntroPhase();
-            yield return PlayPhase();
-            yield return EndPhase();
+            yield return IntroPhase(true);
+            yield return PlayPhase(true);
+            yield return EndPhase(true, -1);
         }
-        yield return MatchEndPhase();
+        yield return MatchEndPhase(true, -1);
     }
 
-    private IEnumerator IntroPhase()
+    /// <param name="host">true: 마네킹·트랩을 직접 배치 / false: 참가자 (호스트가 보낸 배치를 이미 적용함)</param>
+    private IEnumerator IntroPhase(bool host)
     {
         CurrentState = State.Intro;
         SetFrozen(true);
 
         SpawnPlayers();
-        if (mannequinSpawner != null) mannequinSpawner.SpawnForRound();
-        if (trapSpawner != null) trapSpawner.SpawnForRound();
+        if (host)
+        {
+            if (mannequinSpawner != null) mannequinSpawner.SpawnForRound();
+            if (trapSpawner != null) trapSpawner.SpawnForRound();
+        }
         ResetAlive();
         OnRoundStart?.Invoke(CurrentRound);
 
@@ -269,7 +310,8 @@ public class RoundManager : MonoBehaviour
         yield return FadeSpotlight(1f, 0f, spotFadeOut);
     }
 
-    private IEnumerator PlayPhase()
+    /// <param name="host">true: 종료 조건 판정 / false: 참가자 (호스트의 종료 신호까지 타이머만 표시)</param>
+    private IEnumerator PlayPhase(bool host)
     {
         CurrentState = State.Playing;
         forceEnd = false;
@@ -279,11 +321,11 @@ public class RoundManager : MonoBehaviour
         SetFrozen(false);
         OnPlayStart?.Invoke(CurrentRound);
 
-        while (!forceEnd && TimeLeft > 0f)
+        while (!forceEnd && (TimeLeft > 0f || !host))
         {
-            if (participantCount >= 2 && alive.Count <= 1) break;   // 1명만 남음
+            if (host && participantCount >= 2 && alive.Count <= 1) break;   // 1명만 남음
             if (banner.Length > 0 && Time.time > bannerOff) banner = "";
-            TimeLeft -= Time.deltaTime;
+            TimeLeft = Mathf.Max(0f, TimeLeft - Time.deltaTime);
             yield return null;
         }
 
@@ -291,12 +333,13 @@ public class RoundManager : MonoBehaviour
         banner = "";
     }
 
-    private IEnumerator EndPhase()
+    /// <param name="host">true: 승자 직접 판정 / false: 호스트가 보낸 승자(givenWinner) 사용</param>
+    private IEnumerator EndPhase(bool host, int givenWinner)
     {
         CurrentState = State.RoundEnd;
         SetFrozen(true);
 
-        int winner = DecideRoundWinner();
+        int winner = host ? DecideRoundWinner() : givenWinner;
         banner = winner >= 0 ? $"ROUND {CurrentRound} WINNER\n{NameOf(winner)}" : $"ROUND {CurrentRound}\nDRAW";
         OnRoundEnd?.Invoke(CurrentRound, winner);
 
@@ -307,21 +350,67 @@ public class RoundManager : MonoBehaviour
         banner = "";
     }
 
-    private IEnumerator MatchEndPhase()
+    private IEnumerator MatchEndPhase(bool host, int givenWinner)
     {
         CurrentState = State.MatchEnd;
         SetFrozen(true);
 
-        int winner = DecideMatchWinner();
+        int winner = host ? DecideMatchWinner() : givenWinner;
         banner = winner >= 0 ? $"MATCH OVER\nWINNER  {NameOf(winner)}" : "MATCH OVER\nDRAW";
         OnMatchEnd?.Invoke(winner);
         matchRoutine = null;
 
-        if (autoRestartDelay > 0f)
+        if (host && autoRestartDelay > 0f)
         {
             yield return new WaitForSeconds(autoRestartDelay);
             StartMatch();
         }
+    }
+
+    // ───────── 참가자: 호스트 신호 (RoundNetworkSync가 호출) ─────────
+
+    /// <summary>호스트: 라운드 시작 (카운트다운). 마네킹·트랩 배치는 호출 전에 이미 적용됨</summary>
+    public void NetBeginRound(int round)
+    {
+        if (!IsFollower) return;
+        if (matchRoutine != null) StopCoroutine(matchRoutine);
+        if (round <= 1 && ScoreManager.Instance != null) ScoreManager.Instance.ResetScores();   // 새 경기
+        SetSpotlight(0f);
+        CurrentRound = round;
+        matchRoutine = StartCoroutine(IntroPhase(false));
+    }
+
+    /// <summary>호스트: GO (플레이 시작)</summary>
+    public void NetBeginPlay(int round)
+    {
+        if (!IsFollower) return;
+        if (matchRoutine != null) StopCoroutine(matchRoutine);
+        SetSpotlight(0f);   // 카운트다운 연출이 덜 끝났어도 바로 소등
+
+        // 라운드 시작 신호를 놓쳤으면 (늦게 들어옴 등) 생존자 목록부터 채움 → 'YOU ARE DEAD' 오표시 방지
+        if (CurrentState != State.Intro || CurrentRound != round)
+        {
+            CurrentRound = round;
+            ResetAlive();
+        }
+        matchRoutine = StartCoroutine(PlayPhase(false));
+    }
+
+    /// <summary>호스트: 라운드 종료 (승자 = 이 컴퓨터 점수판 id, 무승부 -1)</summary>
+    public void NetEndRound(int round, int winnerId)
+    {
+        if (!IsFollower) return;
+        if (matchRoutine != null) StopCoroutine(matchRoutine);
+        CurrentRound = round;
+        matchRoutine = StartCoroutine(EndPhase(false, winnerId));
+    }
+
+    /// <summary>호스트: 경기 종료</summary>
+    public void NetEndMatch(int winnerId)
+    {
+        if (!IsFollower) return;
+        if (matchRoutine != null) StopCoroutine(matchRoutine);
+        matchRoutine = StartCoroutine(MatchEndPhase(false, winnerId));
     }
 
     // ───────── 스포트라이트 ─────────
@@ -486,7 +575,7 @@ public class RoundManager : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showHud || CurrentState == State.Idle) return;
+        if (!showHud || (CurrentState == State.Idle && string.IsNullOrEmpty(banner))) return;
 
         if (hudStyle == null)
         {
@@ -507,15 +596,16 @@ public class RoundManager : MonoBehaviour
         // 상단: 라운드 / 남은 시간
         int sec = Mathf.CeilToInt(TimeLeft);
         string time = CurrentState == State.Playing ? $"   {sec / 60}:{sec % 60:00}" : "";
-        GUI.Label(new Rect(0, 12, Screen.width, 30), $"ROUND {CurrentRound}/{totalRounds}{time}", hudStyle);
+        if (CurrentState != State.Idle)
+            GUI.Label(new Rect(0, 12, Screen.width, 30), $"ROUND {CurrentRound}/{totalRounds}{time}", hudStyle);
 
         // 내가 죽었으면 표시
         var sm = ScoreManager.Instance;
-        if (CurrentState == State.Playing && sm != null && !alive.Contains(sm.LocalPlayerId))
+        if (CurrentState == State.Playing && localPlayer != null && sm != null && !alive.Contains(sm.LocalPlayerId))
             GUI.Label(new Rect(0, 44, Screen.width, 30), "YOU ARE DEAD", hudStyle);
 
         // 가운데: 카운트다운 / 결과
         if (!string.IsNullOrEmpty(banner))
             GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, Screen.height * 0.3f), banner, bannerStyle);
     }
-}
+}

@@ -13,7 +13,8 @@ using UnityEngine;
 /// [네트워크 5단계] 같은 오브젝트에 PlayerNetworkCombat이 있고 스폰된 상태면 (= 네트워크 플레이어)
 ///  - TakeDamage → 호스트에 전달, 체력은 호스트가 바꾼 값을 받아서 표시
 ///  - 사망 / 부활 / 킬 기록도 PlayerNetworkCombat이 호출 (NetDie / NetRevive)
-///  - 마네킹, 디버그 봇은 지금처럼 각자 컴퓨터에서 처리 (6단계에서 호스트로 옮김)
+///  - 마네킹: 맞힌 사람 화면에서 쓰러지고 MannequinHitLocally로 알림 → 다른 화면에서도 같은 마네킹이 쓰러짐
+///  - 디버그 봇은 각자 컴퓨터에서만 처리
 /// </summary>
 public class Health : MonoBehaviour
 {
@@ -56,6 +57,8 @@ public class Health : MonoBehaviour
     public event Action<Health, float, GameObject> OnDamaged;
     /// <summary>죽었을 때 (대상, 공격자) - 플레이어만</summary>
     public event Action<Health, GameObject> OnDied;
+    /// <summary>내 컴퓨터에서 마네킹을 맞혔을 때 (마네킹, 공격자) - 다른 사람 화면에도 쓰러뜨리기용</summary>
+    public static event Action<Health, GameObject> MannequinHitLocally;
 
     private DecalBlink decal;
     private PlayerNetworkCombat net;
@@ -114,14 +117,8 @@ public class Health : MonoBehaviour
         // 마네킹: 체력 없음, 데칼 발광 + 한 대에 쓰러짐
         if (IsMannequin)
         {
-            if (flashMannequinDecalOnHit) FlashDecal();
-            OnDamaged?.Invoke(this, amount, attacker);
-
-            if (mannequinFallsOnHit)
-            {
-                IsDead = true;   // 중복 피격 방지
-                StartCoroutine(MannequinFall(attacker));
-            }
+            HitMannequin(amount, attacker);
+            MannequinHitLocally?.Invoke(this, attacker);   // 멀티: 다른 사람 화면에도 알림
             return;
         }
 
@@ -164,6 +161,25 @@ public class Health : MonoBehaviour
 
         // 로컬 플레이어는 몸을 남겨둠 (RoundManager가 조작 정지), 봇은 숨김
         if (!IsLocal) SetBodyActive(false);
+    }
+
+    /// <summary>다른 플레이어가 이 마네킹을 맞혔다는 알림 (PlayerNetworkCombat이 호출). 다시 알리지 않음</summary>
+    public void RemoteMannequinHit(GameObject attacker)
+    {
+        if (IsDead || !IsMannequin) return;
+        HitMannequin(0f, attacker);
+    }
+
+    private void HitMannequin(float amount, GameObject attacker)
+    {
+        if (flashMannequinDecalOnHit) FlashDecal();
+        OnDamaged?.Invoke(this, amount, attacker);
+
+        if (mannequinFallsOnHit)
+        {
+            IsDead = true;   // 중복 피격 방지
+            StartCoroutine(MannequinFall(attacker));
+        }
     }
 
     /// <summary>체력 회복 + 몸 다시 표시 (라운드 시작 시)</summary>

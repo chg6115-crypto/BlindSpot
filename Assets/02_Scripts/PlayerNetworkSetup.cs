@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Unity.Cinemachine;
 using Unity.Netcode;
 using UnityEngine;
@@ -15,6 +16,8 @@ using UnityEngine.InputSystem;
 ///  - PlayerInput 컴포넌트는 체크 해제 (다른 플레이어가 내 키보드를 잡아가지 않게)
 ///  - WeaponHolder 오브젝트는 비활성 (GunWeapon/WeaponSwitcher가 Awake에서 태그로 "내 것"인지 판단하므로
 ///    태그를 정한 다음에 켜야 함)
+///
+/// 관전: 내 플레이어에 SpectatorCamera를 자동으로 붙임 (죽으면 살아 있는 플레이어 시점으로 전환)
 /// </summary>
 [DisallowMultipleComponent]
 public class PlayerNetworkSetup : NetworkBehaviour
@@ -39,6 +42,15 @@ public class PlayerNetworkSetup : NetworkBehaviour
     /// <summary>내 플레이어가 준비됐을 때</summary>
     public static event Action<PlayerNetworkSetup> LocalReady;
 
+    private static readonly List<PlayerNetworkSetup> all = new List<PlayerNetworkSetup>();
+    /// <summary>현재 씬의 모든 플레이어 (나 포함)</summary>
+    public static IReadOnlyList<PlayerNetworkSetup> All => all;
+
+    /// <summary>카메라가 따라가는 머리 위치 (관전 시 다른 사람 시점으로 사용)</summary>
+    public Transform CameraRoot => cameraRoot;
+    /// <summary>지금 내가 이 플레이어를 관전 중인지</summary>
+    public bool IsSpectated { get; private set; }
+
     /// <summary>내 플레이어인지 (오프라인 포함). NGO의 IsLocalPlayer는 오프라인에서 false라 따로 둠</summary>
     public bool IsMine { get; private set; }
 
@@ -54,10 +66,12 @@ public class PlayerNetworkSetup : NetworkBehaviour
             if (t != null) weaponHolder = t.gameObject;
         }
         if (cameraRoot == null) cameraRoot = FindChild(transform, "PlayerCameraRoot");
+        if (!all.Contains(this)) all.Add(this);
     }
 
     public override void OnNetworkSpawn()
     {
+        Debug.Log($"[PlayerNetworkSetup] 스폰: client {OwnerClientId} ({(IsOwner ? "내 플레이어" : "다른 플레이어")})", this);
         if (IsOwner) SetupLocal();
         else SetupRemote();
     }
@@ -75,6 +89,7 @@ public class PlayerNetworkSetup : NetworkBehaviour
 
     public override void OnDestroy()
     {
+        all.Remove(this);
         if (Local == this) Local = null;
         base.OnDestroy();
     }
@@ -98,6 +113,9 @@ public class PlayerNetworkSetup : NetworkBehaviour
 
         // 태그를 정한 뒤에 총을 켜야 GunWeapon/WeaponSwitcher가 "내 것"으로 인식
         if (weaponHolder != null) weaponHolder.SetActive(true);
+
+        // 죽으면 다른 플레이어 관전
+        if (GetComponent<SpectatorCamera>() == null) gameObject.AddComponent<SpectatorCamera>();
 
         Local = this;
         if (RoundManager.Instance != null) RoundManager.Instance.SetLocalPlayer(transform);
@@ -146,6 +164,24 @@ public class PlayerNetworkSetup : NetworkBehaviour
                 a.maxDistance = remoteShotHearDistance;
             }
         }
+    }
+
+    // ───────── 관전 ─────────
+
+    /// <summary>
+    /// 내가 이 (다른) 플레이어를 관전하기 시작/끝낼 때 SpectatorCamera가 호출.
+    /// 관전 중에는 그 사람 머리를 숨기고 1인칭 총을 보여줌 → 그 사람 화면처럼 보임
+    /// </summary>
+    public void SetSpectated(bool on)
+    {
+        if (IsMine || IsSpectated == on) return;
+        IsSpectated = on;
+
+        var body = GetComponent<LocalBodyView>();
+        if (body != null) body.SetFirstPerson(on);
+
+        if (weaponHolder != null)
+            foreach (var r in weaponHolder.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = !on;
     }
 
     // ───────── 유틸 ─────────

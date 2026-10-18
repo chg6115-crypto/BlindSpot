@@ -117,7 +117,10 @@ public class TrapBase : MonoBehaviour
     private Transform GetTarget(Collider other)
     {
         Transform root = other.attachedRigidbody != null ? other.attachedRigidbody.transform : other.transform;
-        return root.CompareTag(targetTag) ? root : null;
+        if (root.CompareTag(targetTag)) return root;
+
+        // 멀티: 다른 플레이어가 밟아도 내 화면에서 발동 (위치가 동기화되므로 모든 화면에서 같이 보임)
+        return root.GetComponent<PlayerNetworkSetup>() != null ? root : null;
     }
 
     // ───────── 발동 ─────────
@@ -213,4 +216,4 @@ public class TrapBase : MonoBehaviour
         glowLight.enabled = k > 0.001f;
         glowLight.intensity = lightIntensity * k;
     }
-}
+}

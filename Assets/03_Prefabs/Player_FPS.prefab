@@ -428,6 +428,8 @@ GameObject:
   - component: {fileID: 2921933636093565952}
   - component: {fileID: 2004284540349196222}
   - component: {fileID: 2983639580840948951}
+  - component: {fileID: 527824109752858079}
+  - component: {fileID: 8226557720713721199}
   m_Layer: 6
   m_Name: Player_FPS
   m_TagString: Player
@@ -778,7 +780,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 2429267849
+  GlobalObjectIdHash: 1215715533
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -810,6 +812,7 @@ MonoBehaviour:
   cameraRoot: {fileID: 0}
   remoteTag: Untagged
   remoteFootsteps: 0
+  remoteShotHearDistance: 40
 --- !u!114 &2983639580840948951
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -856,6 +859,32 @@ MonoBehaviour:
   SwitchTransformSpaceWhenParented: 0
   Interpolate: 1
   SlerpPosition: 0
+--- !u!114 &527824109752858079
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8224617769351544002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e747edcd606ae042b89427d536ffc34, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerNetworkCombat
+  ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &8226557720713721199
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8224617769351544002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 011ea3366f3b4d74a4c7036d38d3fd8b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RoundNetworkSync
+  ShowTopMostFoldoutHeaderGroup: 1
 --- !u!1 &8779548771439046991
 GameObject:
   m_ObjectHideFlags: 0

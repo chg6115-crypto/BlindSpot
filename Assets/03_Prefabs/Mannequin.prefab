@@ -8,6 +8,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1495511521450315560, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1495511521450315560, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Intensity
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 3977358996716560008, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -55,6 +63,22 @@ PrefabInstance:
     - target: {fileID: 4357718914165031986, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
       propertyPath: m_TagString
       value: Mannequin
+      objectReference: {fileID: 0}
+    - target: {fileID: 5439475562759461609, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5439475562759461609, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Intensity
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5535496081510700495, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6439344836525006076, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
+      propertyPath: m_Enabled
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -114,4 +138,7 @@ MonoBehaviour:
   flashOnTime: 0.06
   flashOffTime: 0.08
   mannequinTag: Mannequin
+  mannequinFallsOnHit: 1
+  fallDuration: 0.35
+  hideDelay: 1.5
   showHud: 1

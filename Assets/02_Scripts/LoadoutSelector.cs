@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 ///  - OnRoundStart(카운트다운 시작): 선택 UI 표시, 숫자 키 1/2/3으로 선택 → 고른 무기를 바로 손에 보여줌
 ///  - OnPlayStart(GO): 고른 무기만 허용, 나머지 슬롯은 잠금 → 라운드 동안 무기 전환 불가
 ///  - 안 고르면 지난 라운드 무기 유지 (첫 라운드는 Default Index)
+/// 멀티: 내 플레이어가 늦게 스폰돼도 동작 (라운드 신호는 바로 구독, 무기는 찾는 즉시 현재 상태 적용)
 /// 슬롯 순서 = WeaponSwitcher의 무기 순서 (WeaponHolder 자식 순서: Pistol, Shotgun, Sniper)
 /// </summary>
 public class LoadoutSelector : MonoBehaviour
@@ -34,38 +35,54 @@ public class LoadoutSelector : MonoBehaviour
 
     private GUIStyle style;
 
-    private System.Collections.IEnumerator Start()
+    private bool ready;          // 내 무기(WeaponSwitcher)를 찾았는지
+    private bool pendingLock;    // 무기를 찾기 전에 GO 신호가 와서 잠금을 미뤄둠
+
+    private void Start()
     {
-        // 내 플레이어는 네트워크로 나중에 스폰되므로 찾을 때까지 기다림 (최대 30초)
-        float giveUpAt = Time.time + 30f;
-        while (switcher == null || switcher.Count == 0)
-        {
-            if (Time.time > giveUpAt)
-            {
-                Debug.LogWarning("[LoadoutSelector] WeaponSwitcher를 찾지 못했습니다.", this);
-                enabled = false;
-                yield break;
-            }
-
-            var local = PlayerNetworkSetup.Local;
-            if (local != null) switcher = local.GetComponentInChildren<WeaponSwitcher>(true);
-            yield return null;
-        }
-
-        SelectedIndex = Mathf.Clamp(defaultIndex, 0, switcher.Count - 1);
-
+        // 라운드 신호는 바로 구독 (내 플레이어가 늦게 스폰돼도 신호를 놓치지 않게)
         round = RoundManager.Instance;
         if (round != null)
         {
             round.OnRoundStart += HandleRoundStart;
             round.OnPlayStart += HandlePlayStart;
-            // 이미 카운트다운 중이면 바로 선택 시작
-            if (round.CurrentState == RoundManager.State.Intro) HandleRoundStart(round.CurrentRound);
         }
-        else if (lockWithoutRoundManager)
+    }
+
+    /// <summary>내 플레이어의 WeaponSwitcher 찾기 (네트워크 스폰이 늦을 수 있어 매 프레임 확인)</summary>
+    private bool EnsureSwitcher()
+    {
+        if (switcher != null && switcher.Count > 0) return true;
+
+        var local = PlayerNetworkSetup.Local;
+        if (local != null) switcher = local.GetComponentInChildren<WeaponSwitcher>(true);
+        if (switcher == null || switcher.Count == 0) return false;
+
+        if (SelectedIndex < 0) SelectedIndex = Mathf.Clamp(defaultIndex, 0, switcher.Count - 1);
+        return true;
+    }
+
+    /// <summary>무기를 처음 찾았을 때 현재 라운드 상태에 맞춰 적용</summary>
+    private void OnSwitcherReady()
+    {
+        ready = true;
+
+        if (round == null)
+        {
+            if (lockWithoutRoundManager) Lock();
+            return;
+        }
+
+        if (round.CurrentState == RoundManager.State.Intro || IsSelecting)
+        {
+            IsSelecting = true;
+            ApplySelecting();
+        }
+        else if (pendingLock || round.CurrentState == RoundManager.State.Playing)
         {
             Lock();
         }
+        pendingLock = false;
     }
 
     private void OnDestroy()
@@ -82,17 +99,23 @@ public class LoadoutSelector : MonoBehaviour
     private void HandleRoundStart(int roundNumber)
     {
         IsSelecting = true;
-
-        // 선택 중에는 WeaponSwitcher 입력(숫자 키/휠)을 끄고, 모든 슬롯을 열어 미리보기 가능하게
-        switcher.enabled = false;
-        for (int i = 0; i < switcher.Count; i++) switcher.SetAllowed(i, true);
-        switcher.Select(SelectedIndex, true);
+        pendingLock = false;
+        if (EnsureSwitcher()) ApplySelecting();   // 아직 무기가 없으면 찾는 순간 적용 (OnSwitcherReady)
     }
 
     private void HandlePlayStart(int roundNumber)
     {
         IsSelecting = false;
-        Lock();
+        if (EnsureSwitcher()) Lock();
+        else pendingLock = true;
+    }
+
+    /// <summary>선택 중: WeaponSwitcher 입력(숫자 키/휠)을 끄고, 모든 슬롯을 열어 미리보기 가능하게</summary>
+    private void ApplySelecting()
+    {
+        switcher.enabled = false;
+        for (int i = 0; i < switcher.Count; i++) switcher.SetAllowed(i, true);
+        switcher.Select(SelectedIndex, true);
     }
 
     /// <summary>선택한 무기만 허용하고 손에 쥐어줌</summary>
@@ -109,6 +132,12 @@ public class LoadoutSelector : MonoBehaviour
 
     private void Update()
     {
+        if (!ready)
+        {
+            if (!EnsureSwitcher()) return;
+            OnSwitcherReady();
+        }
+
         if (!IsSelecting || switcher == null) return;
         var kb = Keyboard.current;
         if (kb == null) return;
@@ -126,7 +155,7 @@ public class LoadoutSelector : MonoBehaviour
     /// <summary>무기 선택 (UI 버튼에서 호출해도 됨)</summary>
     public void Choose(int index)
     {
-        if (index < 0 || index >= switcher.Count) return;
+        if (!EnsureSwitcher() || index < 0 || index >= switcher.Count) return;
         SelectedIndex = index;
         if (IsSelecting) switcher.Select(index, true);   // 미리보기
     }

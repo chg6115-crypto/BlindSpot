@@ -9,6 +9,7 @@ using UnityEngine.AI;
 ///     - Zones 비어 있음 : NavMesh 전체에서 랜덤 (Spawn Areas에 포함된 Area만)
 ///     - Zones 지정      : 지정한 Box Collider 구역 안에서 랜덤
 ///  공통: NavMesh 바닥 위 + 캡슐 겹침 체크 + 최소 거리
+/// 멀티: 호스트만 배치를 계산하고 참가자는 SpawnLayout으로 같은 자리에 생성 (발사 기록도 호스트가 모두 모음)
 /// </summary>
 public class MannequinSpawner : MonoBehaviour
 {
@@ -115,6 +116,44 @@ public class MannequinSpawner : MonoBehaviour
         foreach (var go in spawned) if (go != null) Destroy(go);
         spawned.Clear();
         usedPositions.Clear();
+    }
+
+    // ───────── 네트워크 (RoundNetworkSync / PlayerNetworkCombat) ─────────
+
+    /// <summary>호스트: 이번 라운드 배치 (위치, Y 회전)를 꺼냄</summary>
+    public void GetLayout(List<Vector3> positions, List<float> yaws)
+    {
+        positions.Clear();
+        yaws.Clear();
+        foreach (var go in spawned)
+        {
+            if (go == null) continue;
+            positions.Add(go.transform.position);
+            yaws.Add(go.transform.eulerAngles.y);
+        }
+    }
+
+    /// <summary>참가자: 호스트가 보낸 배치 그대로 생성 (순서 = 마네킹 번호)</summary>
+    public void SpawnLayout(Vector3[] positions, float[] yaws)
+    {
+        ClearSpawned();
+        if (mannequinPrefab == null || positions == null) return;
+        for (int i = 0; i < positions.Length; i++)
+        {
+            float yaw = yaws != null && i < yaws.Length ? yaws[i] : 0f;
+            Spawn(positions[i], Quaternion.Euler(0f, yaw, 0f));
+        }
+    }
+
+    /// <summary>마네킹 번호 (없으면 -1)</summary>
+    public int IndexOf(GameObject mannequin) => spawned.IndexOf(mannequin);
+
+    /// <summary>번호로 마네킹 Health 찾기</summary>
+    public Health GetMannequin(int index)
+    {
+        if (index < 0 || index >= spawned.Count || spawned[index] == null) return null;
+        var h = spawned[index].GetComponent<Health>();
+        return h != null ? h : spawned[index].GetComponentInChildren<Health>();
     }
 
     /// <summary>맵(NavMesh)을 런타임에 다시 구웠을 때 호출</summary>
@@ -322,4 +361,4 @@ public class MannequinSpawner : MonoBehaviour
         foreach (var z in zones)
             if (z != null) Gizmos.DrawCube(z.bounds.center, z.bounds.size);
     }
-}
+}

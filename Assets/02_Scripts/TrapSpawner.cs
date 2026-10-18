@@ -146,6 +146,63 @@ public class TrapSpawner : MonoBehaviour
         Debug.Log($"[TrapSpawner] 맵 트랩 {mapTrapPositions.Count}개, Reveal 트랩 {placed}/{want}개 배치 (벽 {onWall}, 바닥 {placed - onWall})", this);
     }
 
+    // ───────── 네트워크 (RoundNetworkSync) ─────────
+
+    /// <summary>호스트: 이번 라운드 트랩 배치를 꺼냄 (맵 트랩 켜짐 여부 + Reveal 트랩 위치/회전)</summary>
+    public void GetLayout(out bool[] mapActive, out Vector3[] revealPositions, out Quaternion[] revealRotations)
+    {
+        int n = mapTrapCandidates != null ? mapTrapCandidates.Length : 0;
+        mapActive = new bool[n];
+        for (int i = 0; i < n; i++)
+            mapActive[i] = mapTrapCandidates[i] != null && mapTrapCandidates[i].gameObject.activeSelf;
+
+        var pos = new List<Vector3>();
+        var rot = new List<Quaternion>();
+        foreach (var t in revealPool)
+        {
+            if (t == null || !t.gameObject.activeSelf) continue;
+            pos.Add(t.transform.position);
+            rot.Add(t.transform.rotation);
+        }
+        revealPositions = pos.ToArray();
+        revealRotations = rot.ToArray();
+    }
+
+    /// <summary>참가자: 호스트가 보낸 배치 그대로 적용</summary>
+    public void ApplyLayout(bool[] mapActive, Vector3[] revealPositions, Quaternion[] revealRotations)
+    {
+        mapTrapPositions.Clear();
+        if (mapTrapCandidates != null)
+        {
+            for (int i = 0; i < mapTrapCandidates.Length; i++)
+            {
+                var t = mapTrapCandidates[i];
+                if (t == null) continue;
+                t.gameObject.SetActive(false);   // 껐다 켜서 트랩 상태 초기화
+                bool on = mapActive != null && i < mapActive.Length && mapActive[i];
+                if (on)
+                {
+                    t.gameObject.SetActive(true);
+                    mapTrapPositions.Add(t.transform.position);
+                }
+            }
+        }
+
+        usedPositions.Clear();
+        foreach (var t in revealPool) if (t != null) t.gameObject.SetActive(false);
+        if (revealPositions == null) return;
+
+        int count = Mathf.Min(revealPositions.Length, revealPool.Count);
+        for (int i = 0; i < count; i++)
+        {
+            var trap = revealPool[i];
+            Quaternion r = revealRotations != null && i < revealRotations.Length ? revealRotations[i] : Quaternion.identity;
+            trap.transform.SetPositionAndRotation(revealPositions[i], r);
+            trap.gameObject.SetActive(true);
+            usedPositions.Add(revealPositions[i]);
+        }
+    }
+
     // ───────── 표면 찾기 ─────────
 
     private bool TryFind(bool floor, out Vector3 pos, out Quaternion rot)
@@ -298,4 +355,4 @@ public class TrapSpawner : MonoBehaviour
             (list[i], list[j]) = (list[j], list[i]);
         }
     }
-}
+}

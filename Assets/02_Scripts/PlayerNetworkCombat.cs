@@ -13,18 +13,35 @@ using UnityEngine;
 ///  [무기]   내가 든 무기 번호 공유 → 상대 화면의 3인칭 몸에 같은 총
 ///  [사격]   내가 쏜 빔 / 피격 지점 공유 → 상대 화면에서도 번개 빔 + 총소리
 ///  [이름]   로비 닉네임 공유 → 점수판 / 승자 표시
+///  [마네킹] 내가 맞힌 마네킹 번호 공유 → 모든 화면에서 같은 마네킹이 쓰러짐
+///           호스트는 모든 플레이어의 발사 위치를 모아 다음 라운드 마네킹 배치에 사용
 ///
-/// 라운드 자체는 아직 각자 돌아감 (6단계에서 호스트 기준으로 통일).
+/// 라운드 진행은 RoundNetworkSync가 호스트 기준으로 맞춤.
 /// </summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(Health))]
 public class PlayerNetworkCombat : NetworkBehaviour
 {
-    private const ulong NoClient = ulong.MaxValue;
+    public const ulong NoClient = ulong.MaxValue;
 
     // 접속 번호 → 플레이어 (킬 알림 때 공격자 찾기용)
     private static readonly Dictionary<ulong, PlayerNetworkCombat> byClient = new Dictionary<ulong, PlayerNetworkCombat>();
     public static bool TryGet(ulong clientId, out PlayerNetworkCombat player) => byClient.TryGetValue(clientId, out player);
+
+    /// <summary>이 컴퓨터 점수판 id → 접속 번호 (없으면 NoClient)</summary>
+    public static ulong ClientOfPlayerId(int playerId)
+    {
+        if (playerId < 0) return NoClient;
+        foreach (var kv in byClient)
+            if (kv.Value != null && kv.Value.health.PlayerId == playerId) return kv.Key;
+        return NoClient;
+    }
+
+    /// <summary>접속 번호 → 이 컴퓨터 점수판 id (없으면 -1)</summary>
+    public static int PlayerIdOfClient(ulong clientId)
+    {
+        return clientId != NoClient && TryGet(clientId, out var p) ? p.health.PlayerId : -1;
+    }
 
     private readonly NetworkVariable<float> hp = new NetworkVariable<float>(
         100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
@@ -42,6 +59,8 @@ public class PlayerNetworkCombat : NetworkBehaviour
     private bool hooked;
     private bool scoreRegistered;
     private GameObject lastLocalAttacker;   // 호스트에서만: 네트워크 플레이어가 아닌 공격자 (디버그 봇 등)
+    private MannequinSpawner mannequinSpawner;
+    private bool mannequinHooked;
 
     // ───────── 스폰 ─────────
 
@@ -103,6 +122,14 @@ public class PlayerNetworkCombat : NetworkBehaviour
         // 호스트: 라운드 시작마다 모든 플레이어 체력 회복
         if (IsServer && RoundManager.Instance != null)
             RoundManager.Instance.OnRoundStart += ServerHandleRoundStart;
+
+        // 내가 맞힌 마네킹을 다른 사람에게 알림
+        mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
+        if (IsOwner)
+        {
+            Health.MannequinHitLocally += HandleLocalMannequinHit;
+            mannequinHooked = true;
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -125,6 +152,12 @@ public class PlayerNetworkCombat : NetworkBehaviour
 
         if (RoundManager.Instance != null)
             RoundManager.Instance.OnRoundStart -= ServerHandleRoundStart;
+
+        if (mannequinHooked)
+        {
+            Health.MannequinHitLocally -= HandleLocalMannequinHit;
+            mannequinHooked = false;
+        }
 
         // 나간 플레이어는 점수판에서 제거 (내 항목은 ScoreManager 소유라 두기)
         if (scoreRegistered && !IsOwner && ScoreManager.Instance != null)
@@ -273,6 +306,32 @@ public class PlayerNetworkCombat : NetworkBehaviour
         if (switcher.CurrentIndex != index) switcher.Select(index, true);
         var gun = switcher.GetWeapon(index);
         if (gun != null) gun.PlayRemoteShot(points, normals, hits);
+
+        // 호스트: 다른 플레이어 발사 위치도 다음 라운드 마네킹 배치용으로 기록
+        if (IsServer && mannequinSpawner != null)
+            mannequinSpawner.RecordShot(transform.position, transform.forward);
+    }
+
+    // ───────── 마네킹 ─────────
+
+    private void HandleLocalMannequinHit(Health mannequin, GameObject attacker)
+    {
+        // 내 총에 맞은 것만 (다른 사람 것은 그 사람이 보냄)
+        if (!IsOwner || !IsSpawned || attacker != gameObject || mannequin == null) return;
+        if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
+        if (mannequinSpawner == null) return;
+
+        int index = mannequinSpawner.IndexOf(mannequin.gameObject);
+        if (index >= 0) MannequinHitRpc(index);
+    }
+
+    /// <summary>쏜 사람 → 나머지 모두: 같은 번호의 마네킹을 쓰러뜨림 (공격자 = 이 플레이어)</summary>
+    [Rpc(SendTo.NotMe)]
+    private void MannequinHitRpc(int index)
+    {
+        if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
+        var h = mannequinSpawner != null ? mannequinSpawner.GetMannequin(index) : null;
+        if (h != null) h.RemoteMannequinHit(gameObject);
     }
 
     // ───────── 이름 ─────────
