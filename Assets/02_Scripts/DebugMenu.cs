@@ -7,6 +7,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// 모든 디버그 기능을 한 곳에서 관리 (에디터 / Development Build 전용)
+///  - 일반 빌드(Development Build 체크 해제)에서는 자동으로 꺼짐
 ///  - 키패드 숫자로 실행, 키패드 0으로 메뉴 창 열기/닫기 (메뉴의 버튼을 눌러도 실행)
 ///  - 일반 숫자키 1·2는 무기 전환용으로 비워둠
 ///  - 각 시스템의 공개 함수를 호출하는 방식
@@ -60,6 +61,15 @@ public class DebugMenu : MonoBehaviour
 
     private void Awake()
     {
+        // 일반 빌드: 디버그 기능 전부 끔 (Build Profiles에서 Development Build 체크 시에만 사용 가능)
+        if (!Application.isEditor && !Debug.isDebugBuild)
+        {
+            // Start가 안 불리므로 디버그 조명은 여기서 끔 (안 끄면 맵이 밝게 보임)
+            if (flashlight != null) flashlight.enabled = false;
+            if (debugSun != null) debugSun.enabled = false;
+            enabled = false;
+            return;
+        }
         visible = showOnStart;
         if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
         if (trapSpawner == null) trapSpawner = FindAnyObjectByType<TrapSpawner>();

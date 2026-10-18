@@ -13,6 +13,7 @@ using UnityEngine;
 ///   GO          : 참가자도 동시에 조작 시작
 ///   라운드 종료 : 승자 (접속 번호로 보내서 각자 점수판 id로 변환)
 ///   경기 종료   : 우승자
+///   데칼 점멸   : 호스트의 DecalBlinkManager가 점멸할 때마다 참가자도 같은 순간에 점멸
 /// </summary>
 [DisallowMultipleComponent]
 public class RoundNetworkSync : NetworkBehaviour
@@ -44,6 +45,7 @@ public class RoundNetworkSync : NetworkBehaviour
             round.OnMatchEnd += HostMatchEnd;
             hooked = true;
         }
+        if (IsServer) DecalBlinkManager.FlashStarted += HostFlash;
     }
 
     public override void OnNetworkDespawn()
@@ -56,6 +58,7 @@ public class RoundNetworkSync : NetworkBehaviour
             round.OnMatchEnd -= HostMatchEnd;
         }
         hooked = false;
+        DecalBlinkManager.FlashStarted -= HostFlash;
         if (Channel == this) Channel = null;
     }
 
@@ -87,6 +90,11 @@ public class RoundNetworkSync : NetworkBehaviour
 
     private void HostPlayStart(int roundNumber) => PlayStartRpc(roundNumber);
 
+    private void HostFlash()
+    {
+        if (IsSpawned) FlashRpc();
+    }
+
     private void HostRoundEnd(int roundNumber, int winnerId)
         => RoundEndRpc(roundNumber, PlayerNetworkCombat.ClientOfPlayerId(winnerId));
 
@@ -103,6 +111,12 @@ public class RoundNetworkSync : NetworkBehaviour
         if (mannequins != null) mannequins.SpawnLayout(mannequinPos, mannequinYaw);
         if (traps != null) traps.ApplyLayout(mapTrapActive, trapPos, trapRot);
         if (round != null) round.NetBeginRound(roundNumber);
+    }
+
+    [Rpc(SendTo.NotServer)]
+    private void FlashRpc()
+    {
+        if (DecalBlinkManager.Instance != null) DecalBlinkManager.Instance.PlayFlash();
     }
 
     [Rpc(SendTo.NotServer)]

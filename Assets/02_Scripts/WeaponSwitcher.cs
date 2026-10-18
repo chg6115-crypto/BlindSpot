@@ -52,6 +52,7 @@ public class WeaponSwitcher : MonoBehaviour
     private void Update()
     {
         if (!isLocal || weapons.Length == 0) return;
+        if (PauseMenuUI.IsOpen) return;   // ESC 메뉴 중
 
         var kb = Keyboard.current;
         if (kb != null)

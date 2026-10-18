@@ -4,7 +4,8 @@ using System.Linq;
 using UnityEngine;
 
 /// <summary>
-/// 플레이어별 킬/데스 기록. 점수가 바뀌면 OnScoreChanged 이벤트를 보낸다.
+/// 플레이어별 라운드 승리 / 킬 / 데스 기록. 점수가 바뀌면 OnScoreChanged 이벤트를 보낸다.
+/// 순위 규칙: ① 라운드 승리 수 많은 순 ② 킬 많은 순 ③ 데스 적은 순 (셋 다 같으면 같은 순위 = 무승부)
 /// GameManager 아래에 하나만 배치.
 /// </summary>
 public class ScoreManager : MonoBehaviour
@@ -16,6 +17,7 @@ public class ScoreManager : MonoBehaviour
         public string name;
         public int kills;
         public int deaths;
+        public int roundWins;
         public bool isLocal;
     }
 
@@ -84,22 +86,45 @@ public class ScoreManager : MonoBehaviour
         OnScoreChanged?.Invoke();
     }
 
-    /// <summary>모든 킬/데스를 0으로 (새 경기 시작 시)</summary>
+    /// <summary>라운드 승리 기록</summary>
+    public void AddRoundWin(int id)
+    {
+        if (scores.TryGetValue(id, out var s))
+        {
+            s.roundWins++;
+            OnScoreChanged?.Invoke();
+        }
+    }
+
+    /// <summary>모든 기록을 0으로 (새 경기 시작 시)</summary>
     public void ResetScores()
     {
-        foreach (var s in scores.Values) { s.kills = 0; s.deaths = 0; }
+        foreach (var s in scores.Values) { s.kills = 0; s.deaths = 0; s.roundWins = 0; }
         OnScoreChanged?.Invoke();
     }
 
     // ───────── 조회 ─────────
 
-    /// <summary>순위순 정렬: 킬 많은 순 → 데스 적은 순 → 이름순</summary>
+    /// <summary>순위순 정렬: 라운드 승리 많은 순 → 킬 많은 순 → 데스 적은 순 → 이름순</summary>
     public List<PlayerScore> GetSorted()
     {
         return scores.Values
-            .OrderByDescending(s => s.kills)
+            .OrderByDescending(s => s.roundWins)
+            .ThenByDescending(s => s.kills)
             .ThenBy(s => s.deaths)
             .ThenBy(s => s.name)
             .ToList();
+    }
+
+    /// <summary>순위 기준(라운드 승리 / 킬 / 데스)이 모두 같은지 → 같은 순위</summary>
+    public static bool SameRank(PlayerScore a, PlayerScore b)
+    {
+        return a != null && b != null && a.roundWins == b.roundWins && a.kills == b.kills && a.deaths == b.deaths;
+    }
+
+    /// <summary>id로 이름 찾기 (없으면 null)</summary>
+    public string NameOf(int id)
+    {
+        return scores.TryGetValue(id, out var s) ? s.name : null;
     }
 }

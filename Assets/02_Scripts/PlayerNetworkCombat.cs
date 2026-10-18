@@ -159,9 +159,12 @@ public class PlayerNetworkCombat : NetworkBehaviour
             mannequinHooked = false;
         }
 
-        // 나간 플레이어는 점수판에서 제거 (내 항목은 ScoreManager 소유라 두기)
-        if (scoreRegistered && !IsOwner && ScoreManager.Instance != null)
-            ScoreManager.Instance.Unregister(health.PlayerId);
+        // 나간 플레이어는 생존자 / 점수판에서 제거 (내 항목은 ScoreManager 소유라 두기)
+        if (scoreRegistered && !IsOwner)
+        {
+            if (RoundManager.Instance != null) RoundManager.Instance.RemoveParticipant(health.PlayerId);
+            if (ScoreManager.Instance != null) ScoreManager.Instance.Unregister(health.PlayerId);
+        }
     }
 
     private void RegisterScore()

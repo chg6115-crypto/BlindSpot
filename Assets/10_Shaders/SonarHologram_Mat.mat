@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: SonarHologram_Mat
+  m_Shader: {fileID: 4800000, guid: f2310ddf08e04cbfaf6ef23fe6e6aa7a, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 1
+    - _FillAlpha: 0.2
+    - _Flicker: 0.15
+    - _Inflate: 0.012
+    - _Intensity: 2.5
+    - _LineDensity: 28
+    - _LineStrength: 0.7
+    - _LineWidth: 0.35
+    - _RimPower: 2.5
+    - _RimStrength: 1.2
+    - _ScrollSpeed: 1.2
+    m_Colors:
+    - _Color: {r: 1, g: 0.05, b: 0.85, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

@@ -349,6 +349,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DecalBlinkManager
   intervalRange: {x: 5, y: 10}
+  overtimeIntervalRange: {x: 1.5, y: 3}
   flashDuration: 0.6
   flashCurve:
     serializedVersion: 2
@@ -6008,6 +6009,27 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1289123543
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1862935630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6aa31d615b154ed48058494f65911276, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MatchResultUI
+  font: {fileID: 12800000, guid: 33499636aac85e0499616814d65a6965, type: 3}
+  autoReturnTime: 15
+  accent: {r: 0.2509804, g: 0.9019608, b: 0.9411765, a: 1}
+  gold: {r: 1, g: 0.8039216, b: 0.3137255, a: 1}
+  textColor: {r: 0.8627451, g: 0.89411765, b: 0.9607843, a: 1}
+  dimColor: {r: 0.43137255, g: 0.50980395, b: 0.6666667, a: 1}
+  panelColor: {r: 0.039215688, g: 0.0627451, b: 0.13333334, a: 0.92156863}
+  lineColor: {r: 0.23529412, g: 0.3529412, b: 0.50980395, a: 1}
+  highlightColor: {r: 0.078431375, g: 0.23529412, b: 0.3137255, a: 0.9019608}
 --- !u!1001 &1312981624
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -7725,6 +7747,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::NetworkPlayerSpawner
   playerPrefab: {fileID: 8224617769351544002, guid: 0e84c95c39a3e4841bbb34ea558b5fa0, type: 3}
   spawnPoints: []
+  verboseLog: 1
+  forceSpawnAfter: 10
 --- !u!1001 &1789352306
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -7966,6 +7990,9 @@ GameObject:
   - component: {fileID: 1862935631}
   - component: {fileID: 1862935632}
   - component: {fileID: 1862935633}
+  - component: {fileID: 1289123543}
+  - component: {fileID: 892263046}
+  - component: {fileID: 1196238231}
   m_Layer: 0
   m_Name: RoundManager
   m_TagString: Untagged
@@ -9232,6 +9259,27 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 268c6b415a1395a4090aeca4fd4feb50, type: 3}
+--- !u!114 &1196238231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1862935630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 41c1dd1f362845eab084e4f148aa8459, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PauseMenuUI
+  font: {fileID: 12800000, guid: 33499636aac85e0499616814d65a6965, type: 3}
+  accent: {r: 0.2509804, g: 0.9019608, b: 0.9411765, a: 1}
+  warnColor: {r: 1, g: 0.47058824, b: 0.3529412, a: 1}
+  textColor: {r: 0.8627451, g: 0.89411765, b: 0.9607843, a: 1}
+  dimColor: {r: 0.43137255, g: 0.50980395, b: 0.6666667, a: 1}
+  panelColor: {r: 0.039215688, g: 0.0627451, b: 0.13333334, a: 0.92156863}
+  lineColor: {r: 0.23529412, g: 0.3529412, b: 0.50980395, a: 1}
+  buttonColor: {r: 0.078431375, g: 0.23529412, b: 0.3137255, a: 0.9019608}
+  buttonHoverColor: {r: 0.11764706, g: 0.3529412, b: 0.43137255, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -9252,3 +9300,16 @@ SceneRoots:
   - {fileID: 297936137}
   - {fileID: 1503655618}
   - {fileID: 824158688}
+--- !u!114 &892263046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1862935630}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 69b02b7b296d4c1992cd19f3d66db60f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TabScoreboardUI
+  font: {fileID: 12800000, guid: 33499636aac85e0499616814d65a6965, type: 3}

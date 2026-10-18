@@ -27,10 +27,27 @@ public class LobbyManager : MonoBehaviour
     /// <summary>로비를 거쳐 멀티로 들어갔는지 (디버그 메뉴 제한 등에 사용)</summary>
     public static bool IsMultiplayer => !IsSinglePlayer;
 
+    /// <summary>게임에서 메인 메뉴로 돌아올 때 보여줄 안내 문구 (GameExit이 설정)</summary>
+    public static string PendingMessage { get; set; } = "";
+
+    /// <summary>게임에서 메인 메뉴로 돌아올 때 모드 초기화 (GameExit이 호출)</summary>
+    public static void ResetToMenu()
+    {
+        IsSinglePlayer = true;
+    }
+
+    private static string ConsumePendingMessage()
+    {
+        string m = PendingMessage ?? "";
+        PendingMessage = "";
+        return m;
+    }
+
     const string NickKey = "nickname";
     const string NickProperty = "nick";
     const string PrivateProperty = "priv";
-    static readonly Regex NickRule = new Regex("^[A-Za-z0-9]{4,12}$");
+    static readonly Regex NickRule = new Regex("^[A-Za-z0-9]{4,8}$");
+    const string NickHint = "Enter a nickname: 4-8 letters or numbers (A-Z, 0-9)";
 
     [Header("설정")]
     [SerializeField] private string gameSceneName = "BlindSpot_Warehouse";
@@ -88,6 +105,8 @@ public class LobbyManager : MonoBehaviour
     private bool busy;
     private bool ready;
     private float refreshTimer;
+    private bool allButtonsOn = true;      // SetAllButtons 상태 (처리 중이면 false)
+    private bool onlineButtonsOn;          // SetOnlineButtons 상태 (로그인 완료 시 true)
     private readonly List<RoomListItem> listItems = new List<RoomListItem>();
 
     // ───────── 시작 ─────────
@@ -96,9 +115,11 @@ public class LobbyManager : MonoBehaviour
     {
         if (nicknameInput != null)
         {
-            nicknameInput.characterLimit = 12;
+            nicknameInput.characterLimit = 8;
             nicknameInput.contentType = TMP_InputField.ContentType.Alphanumeric;
-            nicknameInput.text = PlayerPrefs.GetString(NickKey, "");
+            string saved = PlayerPrefs.GetString(NickKey, "");
+            nicknameInput.text = NickRule.IsMatch(saved) ? saved : "";   // 예전 규칙(12자)으로 저장된 닉네임은 비움
+            nicknameInput.onValueChanged.AddListener(_ => OnNicknameChanged());
         }
 
         Bind(singleButton, StartSingle);
@@ -136,12 +157,15 @@ public class LobbyManager : MonoBehaviour
                 await AuthenticationService.Instance.SignInAnonymouslyAsync();
 
             ready = true;
-            SetStatus("");
+            string pending = ConsumePendingMessage();   // 게임에서 돌아왔으면 안내 문구 (예: 호스트가 나감)
+            SetStatus(!string.IsNullOrEmpty(pending) ? pending : (IsNickValid() ? "" : NickHint));
             SetOnlineButtons(true);
         }
         catch (Exception e)
         {
-            SetStatus("Offline - single play only");
+            string pending = ConsumePendingMessage();
+            SetStatus(!string.IsNullOrEmpty(pending) ? pending
+                      : (IsNickValid() ? "Offline - single play only" : "Offline - " + NickHint));
             Debug.LogException(e);
         }
     }
@@ -208,13 +232,36 @@ public class LobbyManager : MonoBehaviour
 
     // ───────── 닉네임 ─────────
 
-    /// <summary>닉네임 검사 (4~12자, 영문/숫자). 통과하면 저장</summary>
+    private string CurrentNick() => nicknameInput != null ? nicknameInput.text.Trim() : "";
+
+    /// <summary>닉네임이 규칙(4~8자, 영문/숫자)에 맞는지</summary>
+    private bool IsNickValid() => NickRule.IsMatch(CurrentNick());
+
+    /// <summary>닉네임 입력이 바뀔 때: 버튼 활성화 갱신 + 안내 문구</summary>
+    private void OnNicknameChanged()
+    {
+        RefreshNickGate();
+        if (busy || session != null) return;
+
+        string current = statusText != null ? statusText.text : "";
+        bool showingHint = current == NickHint || current == "Offline - " + NickHint;
+        if (!IsNickValid())
+        {
+            if (string.IsNullOrEmpty(current) || showingHint) SetStatus(ready ? NickHint : "Offline - " + NickHint);
+        }
+        else if (showingHint)
+        {
+            SetStatus(ready ? "" : "Offline - single play only");
+        }
+    }
+
+    /// <summary>닉네임 검사 (4~8자, 영문/숫자). 통과하면 저장</summary>
     private bool ValidateNickname()
     {
-        string nick = nicknameInput != null ? nicknameInput.text.Trim() : "";
+        string nick = CurrentNick();
         if (!NickRule.IsMatch(nick))
         {
-            SetStatus("Nickname: 4-12 letters or numbers (A-Z, 0-9)");
+            SetStatus(NickHint);
             return false;
         }
         LocalNickname = nick;
@@ -240,6 +287,7 @@ public class LobbyManager : MonoBehaviour
     private void StartSingle()
     {
         if (busy || session != null) return;
+        if (!ValidateNickname()) return;   // 닉네임 필수
 
         var nm = NetworkManager.Singleton;
         if (nm == null) { SetStatus("NetworkManager missing"); return; }
@@ -247,9 +295,6 @@ public class LobbyManager : MonoBehaviour
         busy = true;
         SetAllButtons(false);
 
-        // 닉네임은 규칙에 맞으면 사용, 아니면 기본값
-        string nick = nicknameInput != null ? nicknameInput.text.Trim() : "";
-        LocalNickname = NickRule.IsMatch(nick) ? nick : "Player";
         IsSinglePlayer = true;
 
         // Relay 설정이 남아 있어도 로컬 직접 연결로 덮어씀
@@ -267,6 +312,7 @@ public class LobbyManager : MonoBehaviour
         }
 
         SetStatus("Starting single play...");
+        GameExit.ExpectNetworkGame = true;
         nm.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
     }
 
@@ -418,6 +464,7 @@ public class LobbyManager : MonoBehaviour
 
         session = null;
         IsSinglePlayer = true;
+        GameExit.ExpectNetworkGame = false;
         if (leaveButton != null) leaveButton.interactable = true;
         SetAllButtons(true);
         SetOnlineButtons(ready);
@@ -452,6 +499,10 @@ public class LobbyManager : MonoBehaviour
     {
         session.Changed += RefreshRoom;
         session.RemovedFromSession += OnRemovedFromSession;
+
+        // 대기실에서 호스트가 나가 네트워크가 끊기면 감지 (게스트)
+        GameExit.ExpectNetworkGame = true;
+        if (NetworkManager.Singleton != null) NetworkManager.Singleton.OnClientStopped += OnNetworkStoppedInRoom;
 
         ClearList();
         ShowPanel(roomPanel);
@@ -509,11 +560,28 @@ public class LobbyManager : MonoBehaviour
     private void OnRemovedFromSession()
     {
         Unsubscribe();
-        BackToMenu("Left the room");
+        BackToMenu("Host closed the room");
+    }
+
+    /// <summary>대기실에서 내 네트워크 연결이 끊김 (게스트: 호스트가 방을 나감)</summary>
+    private void OnNetworkStoppedInRoom(bool wasHost)
+    {
+        if (session == null || wasHost) return;
+        var s = session;
+        Unsubscribe();
+        _ = LeaveQuietly(s);
+        BackToMenu("Host closed the room");
+    }
+
+    private static async Task LeaveQuietly(ISession s)
+    {
+        try { await s.LeaveAsync(); }
+        catch (Exception) { /* 이미 방이 없어졌을 수 있음 */ }
     }
 
     private void Unsubscribe()
     {
+        if (NetworkManager.Singleton != null) NetworkManager.Singleton.OnClientStopped -= OnNetworkStoppedInRoom;
         if (session == null) return;
         session.Changed -= RefreshRoom;
         session.RemovedFromSession -= OnRemovedFromSession;
@@ -524,20 +592,33 @@ public class LobbyManager : MonoBehaviour
     /// <summary>서버 연결이 필요한 버튼 (방 만들기 / 찾기 / 참가)</summary>
     private void SetOnlineButtons(bool on)
     {
+        onlineButtonsOn = on;
         foreach (var b in new[] { createRoomButton, findRoomButton, createButton, joinCodeButton, refreshButton })
             if (b != null) b.interactable = on;
         foreach (var item in listItems)
             if (item != null) item.SetInteractable(on);
+        RefreshNickGate();
+    }
+
+    /// <summary>닉네임이 없거나 규칙에 안 맞으면 SINGLE / CREATE ROOM / FIND ROOM 비활성화</summary>
+    private void RefreshNickGate()
+    {
+        bool nick = IsNickValid();
+        if (singleButton != null) singleButton.interactable = allButtonsOn && nick;
+        if (createRoomButton != null) createRoomButton.interactable = allButtonsOn && onlineButtonsOn && nick;
+        if (findRoomButton != null) findRoomButton.interactable = allButtonsOn && onlineButtonsOn && nick;
     }
 
     /// <summary>처리 중(busy)일 때 전체 버튼 잠금. 싱글/설정/종료 포함</summary>
     private void SetAllButtons(bool on)
     {
+        allButtonsOn = on;
         foreach (var b in new[] { singleButton, createRoomButton, findRoomButton, settingsButton, quitButton,
                                   createButton, createBackButton, joinCodeButton, refreshButton, roomListBackButton })
             if (b != null) b.interactable = on;
         foreach (var item in listItems)
             if (item != null) item.SetInteractable(on);
+        RefreshNickGate();
     }
 
     private void SetStatus(string msg)

@@ -180,9 +180,9 @@ public static class LobbyNewBuilder
         var main = Panel(c, "MainPanel");
         MakeText(main, "NicknameLabel", "NICKNAME", 22, Dim, TextAlignmentOptions.Left);
         var nick = MakeInput(main, "NicknameInput", "NICKNAME", 60);
-        nick.characterLimit = 12;
+        nick.characterLimit = 8;
         nick.contentType = TMP_InputField.ContentType.Alphanumeric;
-        MakeText(main, "NicknameHint", "4-12 LETTERS OR NUMBERS", 16, new Color32(110, 125, 160, 255), TextAlignmentOptions.Left);
+        MakeText(main, "NicknameHint", "4-8 LETTERS OR NUMBERS", 16, new Color32(110, 125, 160, 255), TextAlignmentOptions.Left);
         var single = MakeButton(main, "SinglePlayButton", "SINGLE PLAY", 70, TextAlignmentOptions.Left);
         var createRoom = MakeButton(main, "CreateRoomButton", "CREATE ROOM", 70, TextAlignmentOptions.Left);
         var findRoom = MakeButton(main, "FindRoomButton", "FIND ROOM", 70, TextAlignmentOptions.Left);

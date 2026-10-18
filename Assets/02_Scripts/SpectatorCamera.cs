@@ -52,7 +52,7 @@ public class SpectatorCamera : MonoBehaviour
         var kb = Keyboard.current;
         bool next = (mouse != null && mouse.leftButton.wasPressedThisFrame) ||
                     (kb != null && kb.spaceKey.wasPressedThisFrame);
-        if (next) SwitchTo(FindNext(target));
+        if (next && !PauseMenuUI.IsOpen) SwitchTo(FindNext(target));   // ESC 메뉴 클릭은 무시
     }
 
     private static bool IsAlive(PlayerNetworkSetup p)

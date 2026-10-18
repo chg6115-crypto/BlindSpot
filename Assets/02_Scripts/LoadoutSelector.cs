@@ -139,6 +139,7 @@ public class LoadoutSelector : MonoBehaviour
         }
 
         if (!IsSelecting || switcher == null) return;
+        if (PauseMenuUI.IsOpen) return;   // ESC 메뉴 중
         var kb = Keyboard.current;
         if (kb == null) return;
 

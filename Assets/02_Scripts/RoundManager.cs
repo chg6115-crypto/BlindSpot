@@ -24,6 +24,10 @@ using UnityEngine;
 /// [네트워크 4단계] 플레이어는 씬에 미리 두지 않고 NetworkPlayerSpawner가 스폰한다.
 /// 내 플레이어가 스폰되면 PlayerNetworkSetup이 SetLocalPlayer()를 호출 → 그때 경기 시작.
 ///
+/// 라운드 규칙: 마지막 1명이 남으면 종료. 제한 시간이 지나면 연장전(OVERTIME) → 데칼 점멸이 빨라지고 1명 남을 때까지 계속
+///   (혼자 플레이 중이면 제한 시간에 종료). 라운드 무승부 없음 (동시에 전멸한 경우만 무승부)
+/// 경기 우승: ① 라운드 승리 수 ② 킬 ③ 데스 적은 순, 셋 다 같으면 무승부. 경기 종료 시 MatchResultUI가 결과창 표시
+///
 /// [네트워크 6단계] 멀티에서는 호스트만 라운드를 진행한다.
 ///  - 호스트: 지금까지와 똑같이 진행 (마네킹·트랩 배치, 승패 판정). RoundNetworkSync가 각 단계를 참가자에게 알림
 ///  - 참가자: 직접 진행하지 않고(IsFollower) 호스트 신호(NetBeginRound / NetBeginPlay / NetEndRound / NetEndMatch)를 따라감
@@ -94,6 +98,12 @@ public class RoundManager : MonoBehaviour
     public int TotalRounds => totalRounds;
     public float TimeLeft { get; private set; }
     public IReadOnlyCollection<int> AliveIds => alive;
+    /// <summary>라운드별 승자 (점수판 id, 무승부 -1). 결과창 표시용</summary>
+    public IReadOnlyList<int> RoundWinners => roundWinners;
+    /// <summary>연장전 중인지 (제한 시간 초과)</summary>
+    public bool IsOvertime { get; private set; }
+    /// <summary>경기가 일찍 끝난 이유 (예: ALL PLAYERS LEFT). 정상 종료면 빈 문자열</summary>
+    public string MatchEndReason { get; private set; } = "";
     public Transform[] SpawnPoints => spawnPoints;
 
     /// <summary>멀티 참가자(호스트 아님) → 라운드를 직접 진행하지 않고 호스트 신호를 따라감</summary>
@@ -114,6 +124,9 @@ public class RoundManager : MonoBehaviour
     private DecalBlink localDecal;
     private Coroutine matchRoutine;
     private string banner = "";
+    private readonly List<int> roundWinners = new List<int>();
+    private bool hasResultUI;
+    private bool startedWithOthers;   // 호스트: 다른 플레이어와 함께 시작한 경기인지
     private GUIStyle hudStyle, bannerStyle;
 
     // ───────── Unity ─────────
@@ -125,6 +138,7 @@ public class RoundManager : MonoBehaviour
 
         if (mannequinSpawner == null) mannequinSpawner = FindAnyObjectByType<MannequinSpawner>();
         if (trapSpawner == null) trapSpawner = FindAnyObjectByType<TrapSpawner>();
+        hasResultUI = GetComponent<MatchResultUI>() != null;
 
         // Inspector에 직접 넣어둔 플레이어가 있으면 바로 등록 (예전 방식 호환)
         if (localPlayer != null) SetLocalPlayer(localPlayer);
@@ -222,6 +236,10 @@ public class RoundManager : MonoBehaviour
         if (matchRoutine != null) StopCoroutine(matchRoutine);
         SetSpotlight(0f);
         if (ScoreManager.Instance != null) ScoreManager.Instance.ResetScores();
+        roundWinners.Clear();
+        MatchEndReason = "";
+        var nm = NetworkManager.Singleton;
+        startedWithOthers = nm != null && nm.IsListening && nm.IsServer && nm.ConnectedClientsIds.Count >= 2;
         matchRoutine = StartCoroutine(MatchLoop());
     }
 
@@ -261,6 +279,34 @@ public class RoundManager : MonoBehaviour
 
     public bool IsAlive(int id) => alive.Contains(id);
 
+    private void Update()
+    {
+        // 호스트: 같이 시작한 플레이어가 전부 나가면 경기 즉시 종료 → 결과창
+        if (!startedWithOthers || IsFollower) return;
+        if (CurrentState == State.Idle || CurrentState == State.MatchEnd) return;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsListening || !nm.IsServer) return;
+        if (nm.ConnectedClientsIds.Count <= 1) EndMatchEarly("ALL PLAYERS LEFT");
+    }
+
+    /// <summary>경기를 바로 끝내고 결과창으로 (호스트)</summary>
+    public void EndMatchEarly(string reason)
+    {
+        if (IsFollower || CurrentState == State.MatchEnd) return;
+        startedWithOthers = false;
+        MatchEndReason = reason ?? "";
+        if (matchRoutine != null) StopCoroutine(matchRoutine);
+        SetSpotlight(0f);
+        matchRoutine = StartCoroutine(MatchEndPhase(true, -1));
+    }
+
+    /// <summary>나간 플레이어를 생존자에서 제거 (남은 사람이 1명이면 라운드 종료로 이어짐)</summary>
+    public void RemoveParticipant(int id)
+    {
+        alive.Remove(id);
+    }
+
     // ───────── 경기 흐름 ─────────
 
     private IEnumerator MatchLoop()
@@ -280,6 +326,7 @@ public class RoundManager : MonoBehaviour
     {
         CurrentState = State.Intro;
         SetFrozen(true);
+        SetOvertime(false);
 
         SpawnPlayers();
         if (host)
@@ -321,9 +368,19 @@ public class RoundManager : MonoBehaviour
         SetFrozen(false);
         OnPlayStart?.Invoke(CurrentRound);
 
-        while (!forceEnd && (TimeLeft > 0f || !host))
+        while (!forceEnd)
         {
             if (host && participantCount >= 2 && alive.Count <= 1) break;   // 1명만 남음
+
+            // 제한 시간 초과 → 연장전 (혼자면 그냥 종료)
+            if (!IsOvertime && TimeLeft <= 0f)
+            {
+                if (host && participantCount < 2) break;
+                SetOvertime(true);
+                banner = "OVERTIME";
+                bannerOff = Time.time + 1.5f;
+            }
+
             if (banner.Length > 0 && Time.time > bannerOff) banner = "";
             TimeLeft = Mathf.Max(0f, TimeLeft - Time.deltaTime);
             yield return null;
@@ -339,7 +396,12 @@ public class RoundManager : MonoBehaviour
         CurrentState = State.RoundEnd;
         SetFrozen(true);
 
+        SetOvertime(false);
+
         int winner = host ? DecideRoundWinner() : givenWinner;
+        roundWinners.Add(winner);
+        if (winner >= 0 && ScoreManager.Instance != null) ScoreManager.Instance.AddRoundWin(winner);
+
         banner = winner >= 0 ? $"ROUND {CurrentRound} WINNER\n{NameOf(winner)}" : $"ROUND {CurrentRound}\nDRAW";
         OnRoundEnd?.Invoke(CurrentRound, winner);
 
@@ -355,8 +417,10 @@ public class RoundManager : MonoBehaviour
         CurrentState = State.MatchEnd;
         SetFrozen(true);
 
+        SetOvertime(false);
         int winner = host ? DecideMatchWinner() : givenWinner;
-        banner = winner >= 0 ? $"MATCH OVER\nWINNER  {NameOf(winner)}" : "MATCH OVER\nDRAW";
+        // 결과창이 있으면 그쪽에서 표시
+        banner = hasResultUI ? "" : (winner >= 0 ? $"MATCH OVER\nWINNER  {NameOf(winner)}" : "MATCH OVER\nDRAW");
         OnMatchEnd?.Invoke(winner);
         matchRoutine = null;
 
@@ -374,7 +438,12 @@ public class RoundManager : MonoBehaviour
     {
         if (!IsFollower) return;
         if (matchRoutine != null) StopCoroutine(matchRoutine);
-        if (round <= 1 && ScoreManager.Instance != null) ScoreManager.Instance.ResetScores();   // 새 경기
+        if (round <= 1)   // 새 경기
+        {
+            if (ScoreManager.Instance != null) ScoreManager.Instance.ResetScores();
+            roundWinners.Clear();
+            MatchEndReason = "";
+        }
         SetSpotlight(0f);
         CurrentRound = round;
         matchRoutine = StartCoroutine(IntroPhase(false));
@@ -468,14 +537,12 @@ public class RoundManager : MonoBehaviour
         var sm = ScoreManager.Instance;
         if (sm == null) return -1;
 
-        var sorted = sm.GetSorted();   // 킬 많은 순 → 데스 적은 순
+        var sorted = sm.GetSorted();   // 라운드 승리 → 킬 → 데스 적은 순
         if (sorted.Count == 0) return -1;
         if (sorted.Count == 1) return sorted[0].id;
 
-        var a = sorted[0];
-        var b = sorted[1];
-        bool clearWin = a.kills > b.kills || (a.kills == b.kills && a.deaths < b.deaths);
-        return clearWin ? a.id : -1;
+        // 1, 2위의 라운드 승리 / 킬 / 데스가 모두 같으면 무승부
+        return ScoreManager.SameRank(sorted[0], sorted[1]) ? -1 : sorted[0].id;
     }
 
     // ───────── 스폰 / 생존자 ─────────
@@ -550,6 +617,12 @@ public class RoundManager : MonoBehaviour
         participantCount = alive.Count;
     }
 
+    private void SetOvertime(bool on)
+    {
+        IsOvertime = on;
+        if (DecalBlinkManager.Instance != null) DecalBlinkManager.Instance.SetOvertime(on);
+    }
+
     private void SetFrozen(bool frozen)
     {
         if (freezeComponents != null)
@@ -576,6 +649,7 @@ public class RoundManager : MonoBehaviour
     private void OnGUI()
     {
         if (!showHud || (CurrentState == State.Idle && string.IsNullOrEmpty(banner))) return;
+        if (CurrentState == State.MatchEnd && hasResultUI) return;   // 결과창이 화면을 덮음
 
         if (hudStyle == null)
         {
@@ -595,7 +669,7 @@ public class RoundManager : MonoBehaviour
 
         // 상단: 라운드 / 남은 시간
         int sec = Mathf.CeilToInt(TimeLeft);
-        string time = CurrentState == State.Playing ? $"   {sec / 60}:{sec % 60:00}" : "";
+        string time = CurrentState != State.Playing ? "" : (IsOvertime ? "   OVERTIME" : $"   {sec / 60}:{sec % 60:00}");
         if (CurrentState != State.Idle)
             GUI.Label(new Rect(0, 12, Screen.width, 30), $"ROUND {CurrentRound}/{totalRounds}{time}", hudStyle);
 

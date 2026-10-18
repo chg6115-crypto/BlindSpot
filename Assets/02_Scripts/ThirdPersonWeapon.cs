@@ -9,6 +9,8 @@ using UnityEngine.Rendering;
 ///  - 플레이어: WeaponSwitcher가 무기를 바꾸면 같은 이름의 모델만 켬
 ///  - 로컬 플레이어(나): 1인칭 총이 따로 있으므로 3인칭 총은 그림자만 (Shadows Only)
 ///  - 마네킹/봇(WeaponSwitcher 없음): Default Weapon을 들고 있음 ("Random"이면 랜덤)
+///  - 총의 Rendering Layer를 몸과 똑같이 맞춤 → 몸이 안 보이는 곳에서는 총도 안 보임
+///    (총 모델은 기본값 Default라 맵 조명·스포트라이트를 받아서, 가까이 가면 총만 보이던 문제)
 /// 위치/회전은 CharacterBody 프리팹을 열고 WeaponSocket 아래 각 무기 오브젝트를 직접 맞추면 됨.
 ///
 /// 무기별 자세(애니메이터 레이어):
@@ -25,6 +27,8 @@ public class ThirdPersonWeapon : MonoBehaviour
     [SerializeField] private string[] randomPool = { "Shotgun", "Sniper", "Pistol" };
     [Tooltip("로컬 플레이어(나)는 3인칭 총을 그림자만 보이게")]
     [SerializeField] private bool localShadowOnly = true;
+    [Tooltip("총의 Rendering Layer를 몸(SkinnedMeshRenderer)과 같게 → 몸과 똑같은 조명만 받음")]
+    [SerializeField] private bool matchBodyLighting = true;
 
     [System.Serializable]
     public struct WeaponLayer
@@ -65,6 +69,8 @@ public class ThirdPersonWeapon : MonoBehaviour
         foreach (Transform child in socket)
             models[child.name.ToLowerInvariant()] = child.gameObject;
 
+        if (matchBodyLighting) MatchBodyRenderingLayer();
+
         // 무기별 레이어 찾기
         animator = GetComponent<Animator>();
         layerIndex = new int[weaponLayers.Length];
@@ -75,6 +81,23 @@ public class ThirdPersonWeapon : MonoBehaviour
             if (animator != null && layerIndex[i] < 0 && !string.IsNullOrEmpty(weaponLayers[i].layerName))
                 Debug.LogWarning($"[ThirdPersonWeapon] 애니메이터에 '{weaponLayers[i].layerName}' 레이어가 없습니다.", this);
         }
+    }
+
+    /// <summary>몸 메시의 Rendering Layer를 총 모델 전체에 복사</summary>
+    private void MatchBodyRenderingLayer()
+    {
+        SkinnedMeshRenderer body = null;
+        foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            if (smr.transform.IsChildOf(socket)) continue;
+            body = smr;
+            break;
+        }
+        if (body == null) return;
+
+        uint mask = body.renderingLayerMask;
+        foreach (var r in socket.GetComponentsInChildren<Renderer>(true))
+            r.renderingLayerMask = mask;
     }
 
     private void Update()
