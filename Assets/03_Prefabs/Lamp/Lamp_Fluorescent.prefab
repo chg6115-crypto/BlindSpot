@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 9210277880029228120}
   - component: {fileID: 1741895666728460875}
   - component: {fileID: 4077486031875718350}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Spot Light_C
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -155,7 +155,7 @@ GameObject:
   - component: {fileID: 98886215674747260}
   - component: {fileID: 168690396502644163}
   - component: {fileID: 4548795149516745294}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Spot Light_L
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -298,7 +298,7 @@ GameObject:
   - component: {fileID: 1763944499721404575}
   - component: {fileID: 910667969254525114}
   - component: {fileID: 8179166581786205583}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Spot Light_R
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -440,7 +440,8 @@ GameObject:
   - component: {fileID: 8225168873297474087}
   - component: {fileID: 7808557214259262598}
   - component: {fileID: 4566957891733899391}
-  m_Layer: 0
+  - component: {fileID: 5523419871203345517}
+  m_Layer: 9
   m_Name: Lamp_Fluorescent
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -522,3 +523,17 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5523419871203345517
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8225168873297112583}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32099ce49a294ed4a91f6475d1e6fdfb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  lights: []
+  dimEmission: 1

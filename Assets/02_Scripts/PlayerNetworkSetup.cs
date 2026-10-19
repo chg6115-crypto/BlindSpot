@@ -106,6 +106,21 @@ public class PlayerNetworkSetup : NetworkBehaviour
         var pi = GetComponent<PlayerInput>();
         if (pi != null) pi.enabled = true;
 
+        // 런타임에 켜진 PlayerInput은 조작 방식이 바로 안 잡힐 수 있음 → 키보드+마우스로 고정
+        // (안 잡히면 FirstPersonController가 마우스를 게임패드로 보고 시점이 거의 안 움직임. 알트탭하면 풀리던 문제)
+        if (pi != null && Keyboard.current != null && Mouse.current != null)
+        {
+            try { pi.SwitchCurrentControlScheme("KeyboardMouse", Keyboard.current, Mouse.current); }
+            catch (Exception e) { Debug.LogWarning($"[PlayerNetworkSetup] KeyboardMouse 조작 방식 지정 실패: {e.Message}", this); }
+        }
+
+        // 로비에서 풀어 둔 커서를 잠금 (StarterAssetsInputs는 창 포커스가 바뀔 때만 잠가서 알트탭 전까지 커서가 보였음)
+        if (!PauseMenuUI.IsOpen)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
         // 씬의 PlayerFollowCamera가 내 머리를 따라가게
         var vcam = FindAnyObjectByType<CinemachineCamera>();
         if (vcam != null && cameraRoot != null) vcam.Follow = cameraRoot;

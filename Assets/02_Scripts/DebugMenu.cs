@@ -86,6 +86,8 @@ public class DebugMenu : MonoBehaviour
         Add(Key.Numpad9, "캐릭터 데칼 항상 켜기", ToggleCharacterDecals, () => OnOff(DecalBlink.DebugForceOn));
         Add(Key.F5, "경기 재시작", RestartMatch, null);
         Add(Key.F6, "적 봇 소환 (내 앞)", SpawnBot, null);
+        Add(Key.F7, "날씨 바꾸기 (달밤→비→폭풍)", CycleWeather, WeatherState);
+        Add(Key.F8, "번개 치기 (지금)", StrikeLightning, null);
     }
 
     private void Start()
@@ -210,6 +212,21 @@ public class DebugMenu : MonoBehaviour
         }
         if (trapSpawner != null) trapSpawner.SpawnForRound();
         Debug.Log("[DebugMenu] 라운드 넘김 (재배치)");
+    }
+
+    private void CycleWeather()
+    {
+        if (WeatherManager.Instance != null) WeatherManager.Instance.DebugCycle();
+        else Debug.LogWarning("[DebugMenu] 씬에 WeatherManager가 없습니다.");
+    }
+
+    private static string WeatherState()
+        => WeatherManager.Instance != null ? WeatherManager.Instance.Current.ToString() : "없음";
+
+    private void StrikeLightning()
+    {
+        if (LightningStorm.Instance != null) LightningStorm.Instance.DebugStrikeNow();
+        else Debug.LogWarning("[DebugMenu] 씬에 LightningStorm이 없습니다.");
     }
 
     private void RestartMatch()

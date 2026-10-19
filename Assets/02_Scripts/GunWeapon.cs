@@ -144,6 +144,8 @@ public class GunWeapon : MonoBehaviour
     public event Action OnReloadStarted;
     /// <summary>발사 연출 정보 (총, 펠릿별 맞은 지점, 면 방향, 명중 여부) - 네트워크 전달용</summary>
     public event Action<GunWeapon, Vector3[], Vector3[], bool[]> OnShotFx;
+    /// <summary>어떤 총이든 총알이 닿은 지점들 (내가 쏜 것 + 다른 사람 화면 재생 모두). 자동차 경보 등 환경 반응용</summary>
+    public static event Action<Vector3[]> AnyShotImpact;
 
     public string WeaponName => weaponName;
     public float BarrelLength => barrelLength;
@@ -424,6 +426,7 @@ public class GunWeapon : MonoBehaviour
 
         OnFired?.Invoke(firstPoint, firstHealth);
         OnShotFx?.Invoke(this, fxPoints, fxNormals, fxHits);
+        AnyShotImpact?.Invoke(fxPoints);
         return true;
     }
 
@@ -498,6 +501,8 @@ public class GunWeapon : MonoBehaviour
     /// </summary>
     public void PlayRemoteShot(Vector3[] points, Vector3[] normals, bool[] hitFlags)
     {
+        AnyShotImpact?.Invoke(points);
+
         if (fireClip != null && audioSource != null && audioSource.isActiveAndEnabled)
         {
             audioSource.spatialBlend = 1f;   // 원격 총소리는 3D (Awake가 0으로 되돌릴 수 있어 매번 지정)

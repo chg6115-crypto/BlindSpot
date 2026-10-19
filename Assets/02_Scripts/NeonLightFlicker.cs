@@ -20,6 +20,13 @@ public class NeonLightFlicker : MonoBehaviour
 
     private void Update()
     {
+        if (PowerOutage.IsOut)   // 정전: 꺼둠
+        {
+            targetLight.intensity = 0f;
+            nextChangeTime = 0f;
+            return;
+        }
+
         if (Time.time < nextChangeTime)
             return;
 

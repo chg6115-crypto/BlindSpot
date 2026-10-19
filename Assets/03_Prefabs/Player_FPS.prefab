@@ -713,7 +713,7 @@ MonoBehaviour:
   startCooldown: 5
   offset: {x: 0, y: 0, z: 0}
   expandTime: 1
-  holdTime: 1
+  holdTime: 2
   fadeTime: 2
   localPlayerTag: Player
   showHud: 1
@@ -733,7 +733,7 @@ MonoBehaviour:
   walkRadius: 20
   runRadius: 20
   fadeInTime: 0.3
-  fadeOutTime: 1
+  fadeOutTime: 2
   radiusChangeTime: 0.5
   runSpeedThreshold: 5
   minMoveSpeed: 0.5
@@ -783,7 +783,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 1215715533
+  GlobalObjectIdHash: 2429267849
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -888,6 +888,74 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RoundNetworkSync
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &8583273075793238257
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8224617769351544002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fdf6d2f041db482d9c0fe182103e3a42, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootstepAudio
+  footstepClips:
+  - {fileID: 8300000, guid: 72f526a6a9890f643a88e85a61c86c8a, type: 3}
+  - {fileID: 8300000, guid: 85016e0f2b01da248b9663dd49a161b0, type: 3}
+  - {fileID: 8300000, guid: 186de84b3207156479abe98f4958fed0, type: 3}
+  - {fileID: 8300000, guid: 1a91fcd19acf1e54bba0945d9f390849, type: 3}
+  - {fileID: 8300000, guid: 14e8a8d2158bec840b56c54f5266e692, type: 3}
+  - {fileID: 8300000, guid: 29841e7d5bbfb5b419c9ad16ca8bc4c1, type: 3}
+  - {fileID: 8300000, guid: dd1af302b8902684d9381de1f2d3a5af, type: 3}
+  - {fileID: 8300000, guid: 67c8b33e424ccdc4486edf538ab91c5a, type: 3}
+  - {fileID: 8300000, guid: 274649b0e221539409070ebf6c18918b, type: 3}
+  - {fileID: 8300000, guid: a3194b8bbc96ef84fab1f98f4b7dae3e, type: 3}
+  landClip: {fileID: 8300000, guid: ff697d3070687ce4583faa0561a145a2, type: 3}
+  walkStride: 2
+  runStride: 2.6
+  runSpeedThreshold: 5
+  minMoveSpeed: 0.5
+  walkVolume: 0.35
+  runVolume: 0.85
+  localVolumeScale: 0.6
+  landVolume: 0.7
+  pitchRange: {x: 0.92, y: 1.08}
+  walkHearDistance: 10
+  runHearDistance: 20
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 439
+  groundCheckDistance: 0.3
+  landMinAirTime: 0.3
+--- !u!114 &665788640219431648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8224617769351544002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e81e436fd92489a9a1fbd29adab4b6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SonarReveal
+  hologramMaterial: {fileID: 2100000, guid: 6a3e94d5c96f49ac83cc9551c72ae5cb, type: 2}
+  frameCount: 3
+  frameInterval: 0.2
+  includeMeshRenderers: 1
+  revealSpeed: 0
+  maxRevealDistance: 150
+  wallMask:
+    serializedVersion: 2
+    m_Bits: 439
+  originHeight: 1.2
+  targetHeights:
+  - 0.5
+  - 1
+  - 1.6
+  reachHeight: 1
+  verboseLog: 0
 --- !u!1 &8779548771439046991
 GameObject:
   m_ObjectHideFlags: 0
@@ -1244,69 +1312,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3977358996716560008, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
   m_PrefabInstance: {fileID: 6832246638503890089}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &8583273075793238257
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8224617769351544002}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fdf6d2f041db482d9c0fe182103e3a42, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::FootstepAudio
-  footstepClips:
-  - {fileID: 8300000, guid: 72f526a6a9890f643a88e85a61c86c8a, type: 3}
-  - {fileID: 8300000, guid: 85016e0f2b01da248b9663dd49a161b0, type: 3}
-  - {fileID: 8300000, guid: 186de84b3207156479abe98f4958fed0, type: 3}
-  - {fileID: 8300000, guid: 1a91fcd19acf1e54bba0945d9f390849, type: 3}
-  - {fileID: 8300000, guid: 14e8a8d2158bec840b56c54f5266e692, type: 3}
-  - {fileID: 8300000, guid: 29841e7d5bbfb5b419c9ad16ca8bc4c1, type: 3}
-  - {fileID: 8300000, guid: dd1af302b8902684d9381de1f2d3a5af, type: 3}
-  - {fileID: 8300000, guid: 67c8b33e424ccdc4486edf538ab91c5a, type: 3}
-  - {fileID: 8300000, guid: 274649b0e221539409070ebf6c18918b, type: 3}
-  - {fileID: 8300000, guid: a3194b8bbc96ef84fab1f98f4b7dae3e, type: 3}
-  landClip: {fileID: 8300000, guid: ff697d3070687ce4583faa0561a145a2, type: 3}
-  walkStride: 2
-  runStride: 2.6
-  runSpeedThreshold: 5
-  minMoveSpeed: 0.5
-  walkVolume: 0.35
-  runVolume: 0.85
-  localVolumeScale: 0.6
-  landVolume: 0.7
-  pitchRange: {x: 0.92, y: 1.08}
-  walkHearDistance: 10
-  runHearDistance: 20
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 4294967231
-  groundCheckDistance: 0.3
-  landMinAirTime: 0.3
---- !u!114 &665788640219431648
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8224617769351544002}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7e81e436fd92489a9a1fbd29adab4b6b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::SonarReveal
-  hologramMaterial: {fileID: 2100000, guid: 6a3e94d5c96f49ac83cc9551c72ae5cb, type: 2}
-  holdTime: 0.25
-  fadeTime: 0.15
-  includeMeshRenderers: 1
-  wallMask:
-    serializedVersion: 2
-    m_Bits: 4294967231
-  originHeight: 1.2
-  targetHeights:
-  - 0.5
-  - 1
-  - 1.6
-  reachHeight: 1
-  verboseLog: 0

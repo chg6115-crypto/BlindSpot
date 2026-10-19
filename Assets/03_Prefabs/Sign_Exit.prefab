@@ -183,6 +183,7 @@ GameObject:
   - component: {fileID: 3701121203067904508}
   - component: {fileID: 2996782323678096849}
   - component: {fileID: 843919362081827899}
+  - component: {fileID: 6417015625418633367}
   m_Layer: 0
   m_Name: Point Light
   m_TagString: Untagged
@@ -199,7 +200,7 @@ Transform:
   m_GameObject: {fileID: 7802136331957453348}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -0.018, z: -0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -216,8 +217,8 @@ Light:
   serializedVersion: 13
   m_Type: 2
   m_Color: {r: 0, g: 1, b: 0, a: 1}
-  m_Intensity: 1
-  m_Range: 2
+  m_Intensity: 0.3
+  m_Range: 3
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -299,3 +300,18 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!114 &6417015625418633367
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7802136331957453348}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ccab4bb495e4f4b8d6e84528a0c915c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RevealLight
+  minIntensity: 0.1
+  lightCharacters: 1
+  ignoreRoot: {fileID: 0}

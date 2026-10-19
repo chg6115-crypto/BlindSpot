@@ -7,7 +7,10 @@ using UnityEngine.Rendering.Universal;
 ///
 ///  - 이 라이트가 켜져 있고(Min Intensity 이상) 범위 안 + 라이트와 사이에 벽이 없으면 캐릭터 몸이 보임
 ///    (CharacterVisibility가 IsPointLit으로 확인. 플레이어 / 마네킹 / 봇 공통)
-///  - Point: 반경(Range) 안 / Spot: 원뿔(Spot Angle) 안. Directional·Area는 지원 안 함
+///  - Point: 반경(Range) 안 / Spot: 원뿔(Spot Angle) 안
+///  - Directional: 빛이 오는 방향(하늘 쪽)으로 Directional Reach 거리까지 막힌 게 없으면 (창문 빛 자국, 실외)
+///  - Area는 지원 안 함
+///  - LightPassThrough가 붙은 물체(창문 유리 등)는 빛을 막지 않음
 ///  - 깜빡이는 라이트(NeonLightFlicker 등)는 켜진 순간에만 보임
 ///  - 라이트가 캐릭터 몸도 비추도록 Rendering Layer를 전부로 설정 (Light Characters)
 ///  - TrapBase는 라이트에 이 컴포넌트를 자동으로 붙임
@@ -22,6 +25,8 @@ public class RevealLight : MonoBehaviour
     [SerializeField] private bool lightCharacters = true;
     [Tooltip("벽 검사에서 무시할 오브젝트 (등 기구 자체 콜라이더 등). 비우면 부모 오브젝트")]
     [SerializeField] private Transform ignoreRoot;
+    [Tooltip("Directional 라이트: 빛이 오는 쪽으로 이 거리(m)까지 막힌 게 없으면 비춰지는 것으로 봄")]
+    [SerializeField, Min(1f)] private float directionalReach = 200f;
 
     private static readonly List<RevealLight> all = new List<RevealLight>();
     private static readonly RaycastHit[] hits = new RaycastHit[8];
@@ -76,6 +81,12 @@ public class RevealLight : MonoBehaviour
         var l = lightComp;
         if (l == null || !l.enabled || l.intensity < minIntensity || l.intensity <= 0.001f) return false;
 
+        if (l.type == LightType.Directional)
+        {
+            Vector3 toLight = -l.transform.forward;
+            return !IsBlocked(point, toLight, directionalReach);
+        }
+
         Vector3 lp = l.transform.position;
         Vector3 d = point - lp;
         float dist = d.magnitude;
@@ -91,7 +102,7 @@ public class RevealLight : MonoBehaviour
                 if (Vector3.Angle(l.transform.forward, dir) > l.spotAngle * 0.5f) return false;
                 break;
             default:
-                return false;   // Directional / Area 미지원
+                return false;   // Area 미지원
         }
 
         return !IsBlocked(lp, dir, dist);
@@ -106,6 +117,7 @@ public class RevealLight : MonoBehaviour
             if (col == null) continue;
             if (ignoreRoot != null && col.transform.IsChildOf(ignoreRoot)) continue;   // 등 기구 / 트랩 자신
             if (col.GetComponentInParent<Health>() != null) continue;                 // 캐릭터/마네킹은 벽이 아님
+            if (col.GetComponentInParent<LightPassThrough>() != null) continue;       // 창문 유리 등 빛이 통과하는 것
             return true;
         }
         return false;

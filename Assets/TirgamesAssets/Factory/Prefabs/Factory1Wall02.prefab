@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 33915994243064020}
   - component: {fileID: 23062965027642900}
   - component: {fileID: 64814754167519894}
+  - component: {fileID: 7716203958841205173}
   m_Layer: 8
   m_Name: Factory1Wall02Glass
   m_TagString: Untagged
@@ -261,3 +262,15 @@ Transform:
   - {fileID: 4691767299415072}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &7716203958841205173
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1246125844450088}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e05c121d48a04b768f5738a07025ae21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

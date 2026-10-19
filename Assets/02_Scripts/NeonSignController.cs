@@ -34,11 +34,16 @@ public class NeonSignController : MonoBehaviour
 
     private void OnEnable()
     {
+        PowerOutage.Changed += OnPowerChanged;
         StartCoroutine(FlickerRoutine());
+        if (PowerOutage.IsOut) ApplyState();
     }
+
+    private void OnPowerChanged(bool outage) => ApplyState();
 
     private void OnDisable()
     {
+        PowerOutage.Changed -= OnPowerChanged;
         StopAllCoroutines();
         wholeSignOff = false;
         faultyCharacterOff = false;
@@ -77,10 +82,11 @@ public class NeonSignController : MonoBehaviour
 
     private void ApplyState()
     {
+        bool signOff = wholeSignOff || PowerOutage.IsOut;   // 정전이면 통째로 꺼짐
         if (neonText != null)
         {
-            neonText.enabled = !wholeSignOff;
-            if (!wholeSignOff)
+            neonText.enabled = !signOff;
+            if (!signOff)
             {
                 neonText.ForceMeshUpdate();
                 TMP_TextInfo info = neonText.textInfo;
@@ -99,6 +105,6 @@ public class NeonSignController : MonoBehaviour
 
         for (int i = 0; i < neonLights.Length; i++)
             if (neonLights[i] != null)
-                neonLights[i].intensity = wholeSignOff ? 0f : initialLightIntensities[i];
+                neonLights[i].intensity = signOff ? 0f : initialLightIntensities[i];
     }
 }

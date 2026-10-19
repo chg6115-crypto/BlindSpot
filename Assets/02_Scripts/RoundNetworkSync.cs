@@ -14,6 +14,8 @@ using UnityEngine;
 ///   라운드 종료 : 승자 (접속 번호로 보내서 각자 점수판 id로 변환)
 ///   경기 종료   : 우승자
 ///   데칼 점멸   : 호스트의 DecalBlinkManager가 점멸할 때마다 참가자도 같은 순간에 점멸
+///   날씨        : 라운드마다 호스트가 정한 날씨 (WeatherManager)
+///   번개        : 종류·위치·연출 시드 (LightningStorm)
 /// </summary>
 [DisallowMultipleComponent]
 public class RoundNetworkSync : NetworkBehaviour
@@ -101,7 +103,31 @@ public class RoundNetworkSync : NetworkBehaviour
     private void HostMatchEnd(int winnerId)
         => MatchEndRpc(PlayerNetworkCombat.ClientOfPlayerId(winnerId));
 
+    /// <summary>호스트: 날씨를 참가자에게 (WeatherManager가 호출)</summary>
+    public void SendWeather(int roundNumber, int weather)
+    {
+        if (IsSpawned && IsServer) WeatherRpc(roundNumber, weather);
+    }
+
+    /// <summary>호스트: 번개를 참가자에게 (LightningStorm이 호출)</summary>
+    public void SendLightning(int kind, Vector3 position, int seed)
+    {
+        if (IsSpawned && IsServer) LightningRpc(kind, position, seed);
+    }
+
     // ───────── 참가자에서 실행 ─────────
+
+    [Rpc(SendTo.NotServer)]
+    private void WeatherRpc(int roundNumber, int weather)
+    {
+        if (WeatherManager.Instance != null) WeatherManager.Instance.ApplyFromHost(weather);
+    }
+
+    [Rpc(SendTo.NotServer)]
+    private void LightningRpc(int kind, Vector3 position, int seed)
+    {
+        if (LightningStorm.Instance != null) LightningStorm.Instance.PlayStrike(kind, position, seed);
+    }
 
     [Rpc(SendTo.NotServer)]
     private void RoundStartRpc(int roundNumber, Vector3[] mannequinPos, float[] mannequinYaw,
