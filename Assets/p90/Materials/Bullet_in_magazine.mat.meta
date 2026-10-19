@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 5c34f014177d936459866cda9bf01cc1
+timeCreated: 1513907919
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 105722
+  packageName: P90 HD
+  packageVersion: 1.0
+  assetPath: Assets/p90/Materials/Bullet_in_magazine.mat
+  uploadId: 220163

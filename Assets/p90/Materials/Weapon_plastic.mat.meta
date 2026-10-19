@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: 71843059e74de514981be35e184255c1
+timeCreated: 1513907919
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 105722
+  packageName: P90 HD
+  packageVersion: 1.0
+  assetPath: Assets/p90/Materials/Weapon_plastic.mat
+  uploadId: 220163

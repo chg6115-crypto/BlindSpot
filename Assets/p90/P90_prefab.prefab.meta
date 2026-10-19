@@ -1,0 +1,17 @@
+fileFormatVersion: 2
+guid: e619ccef6f93dbf42adadf4d5f49f320
+timeCreated: 1513908624
+licenseType: Store
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 100100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 105722
+  packageName: P90 HD
+  packageVersion: 1.0
+  assetPath: Assets/p90/P90_prefab.prefab
+  uploadId: 220163

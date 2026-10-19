@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: da164e9180a81ca41a60a115eec9d2f0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 224573
+  packageName: A3500X Pistol
+  packageVersion: 1.0.0
+  assetPath: Assets/A3500X/Materials/A3500X silver.mat
+  uploadId: 521805
