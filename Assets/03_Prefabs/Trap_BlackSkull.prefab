@@ -105,6 +105,10 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 3028979404926796662, guid: 268c6b415a1395a4090aeca4fd4feb50, type: 3}
+      propertyPath: flashOnTime
+      value: 0.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 3028979404926796662, guid: 268c6b415a1395a4090aeca4fd4feb50, type: 3}
       propertyPath: lightIntensity
       value: 1
       objectReference: {fileID: 0}
