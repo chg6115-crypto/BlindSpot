@@ -1,202 +1,166 @@
+using System;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
-/// 라운드 시작 카운트다운 동안 무기 1개를 고르게 한다. (권총 / 샷건 / 스나이퍼 중 하나)
-/// 씬의 RoundManager 오브젝트(또는 아무 오브젝트)에 붙인다.
-///  - OnRoundStart(카운트다운 시작): 선택 UI 표시, 숫자 키 1/2/3으로 선택 → 고른 무기를 바로 손에 보여줌
-///  - OnPlayStart(GO): 고른 무기만 허용, 나머지 슬롯은 잠금 → 라운드 동안 무기 전환 불가
-///  - 안 고르면 지난 라운드 무기 유지 (첫 라운드는 Default Index)
-/// 멀티: 내 플레이어가 늦게 스폰돼도 동작 (라운드 신호는 바로 구독, 무기는 찾는 즉시 현재 상태 적용)
-/// 슬롯 순서 = WeaponSwitcher의 무기 순서 (WeaponHolder 자식 순서: Pistol, Shotgun, Sniper)
+/// 라운드 무기 지급 (BlindFire 방식). 씬의 RoundManager 오브젝트에 붙인다.
+///  - 라운드가 시작될 때(카운트다운) 호스트가 Weapon Names 중 하나를 랜덤으로 정함 → 모든 플레이어가 같은 총
+///    참가자는 호스트가 보낸 값을 사용 (RoundNetworkSync.RoundWeaponRpc). 싱글은 혼자 정함
+///  - 내 플레이어: 그 총만 허용하고 손에 쥐어줌 (라운드 동안 전환 불가)
+///  - 마네킹·봇: ThirdPersonWeapon이 RoundWeaponChanged를 받아 같은 총을 듦 (총으로 구분 안 되게)
+///  - 카운트다운 동안 화면에 "WEAPON: 이름" 표시
+/// Weapon Names 순서 = WeaponHolder 자식(GunWeapon) 순서. 이름은 GunWeapon.WeaponName / 3인칭 WeaponSocket 자식 이름과 같게.
 /// </summary>
 public class LoadoutSelector : MonoBehaviour
 {
+    [Tooltip("지급 후보 (WeaponHolder 자식 순서와 같게)")]
+    [SerializeField] private string[] weaponNames = { "A3500X", "SCAR-L" };
     [Tooltip("비우면 스폰된 내 플레이어(PlayerNetworkSetup.Local)에서 자동 검색")]
     [SerializeField] private WeaponSwitcher switcher;
-    [Tooltip("첫 라운드 기본 무기 슬롯 (0부터)")]
-    [SerializeField, Min(0)] private int defaultIndex = 0;
-    [Tooltip("RoundManager가 없을 때(테스트 씬)도 무기 1개로 제한할지")]
+    [Tooltip("RoundManager가 없을 때(테스트 씬)도 랜덤 1개로 제한할지")]
     [SerializeField] private bool lockWithoutRoundManager = false;
 
-    [Header("UI")]
+    [Header("UI (카운트다운 중 무기 이름)")]
     [SerializeField] private bool showUI = true;
-    [SerializeField] private int fontSize = 22;
+    [SerializeField] private int fontSize = 26;
     [SerializeField, Range(0f, 1f)] private float panelY = 0.72f;
-    [SerializeField] private Color normalColor = new Color(1f, 1f, 1f, 0.55f);
-    [SerializeField] private Color selectedColor = new Color(0.3f, 1f, 0.9f, 1f);
+    [SerializeField] private Color textColor = new Color(0.3f, 1f, 0.9f, 1f);
 
-    public int SelectedIndex { get; private set; } = -1;
-    public bool IsSelecting { get; private set; }
+    /// <summary>이번 라운드 무기 번호 (-1 = 아직 없음)</summary>
+    public static int RoundWeaponIndex { get; private set; } = -1;
+    /// <summary>이번 라운드 무기 이름 (null = 아직 없음)</summary>
+    public static string RoundWeaponName { get; private set; }
+    /// <summary>라운드 무기가 정해질 때 (이름)</summary>
+    public static event Action<string> RoundWeaponChanged;
+
+    public static LoadoutSelector Instance { get; private set; }
 
     private RoundManager round;
-    private static readonly Key[] NumberKeys =
-        { Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9 };
-
     private GUIStyle style;
+    private bool applied;   // 현재 무기를 내 손에 적용했는지
 
-    private bool ready;          // 내 무기(WeaponSwitcher)를 찾았는지
-    private bool pendingLock;    // 무기를 찾기 전에 GO 신호가 와서 잠금을 미뤄둠
+    private void Awake()
+    {
+        Instance = this;
+        RoundWeaponIndex = -1;
+        RoundWeaponName = null;
+    }
 
     private void Start()
     {
-        // 라운드 신호는 바로 구독 (내 플레이어가 늦게 스폰돼도 신호를 놓치지 않게)
         round = RoundManager.Instance;
-        if (round != null)
-        {
-            round.OnRoundStart += HandleRoundStart;
-            round.OnPlayStart += HandlePlayStart;
-        }
-    }
-
-    /// <summary>내 플레이어의 WeaponSwitcher 찾기 (네트워크 스폰이 늦을 수 있어 매 프레임 확인)</summary>
-    private bool EnsureSwitcher()
-    {
-        if (switcher != null && switcher.Count > 0) return true;
-
-        var local = PlayerNetworkSetup.Local;
-        if (local != null) switcher = local.GetComponentInChildren<WeaponSwitcher>(true);
-        if (switcher == null || switcher.Count == 0) return false;
-
-        if (SelectedIndex < 0) SelectedIndex = Mathf.Clamp(defaultIndex, 0, switcher.Count - 1);
-        return true;
-    }
-
-    /// <summary>무기를 처음 찾았을 때 현재 라운드 상태에 맞춰 적용</summary>
-    private void OnSwitcherReady()
-    {
-        ready = true;
-
-        if (round == null)
-        {
-            if (lockWithoutRoundManager) Lock();
-            return;
-        }
-
-        if (round.CurrentState == RoundManager.State.Intro || IsSelecting)
-        {
-            IsSelecting = true;
-            ApplySelecting();
-        }
-        else if (pendingLock || round.CurrentState == RoundManager.State.Playing)
-        {
-            Lock();
-        }
-        pendingLock = false;
+        if (round != null) round.OnRoundStart += HandleRoundStart;
+        else if (lockWithoutRoundManager) SetRoundWeapon(PickRandom());
     }
 
     private void OnDestroy()
     {
-        if (round != null)
-        {
-            round.OnRoundStart -= HandleRoundStart;
-            round.OnPlayStart -= HandlePlayStart;
-        }
+        if (round != null) round.OnRoundStart -= HandleRoundStart;
+        if (Instance == this) Instance = null;
     }
 
-    // ───────── 라운드 흐름 ─────────
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        RoundWeaponIndex = -1;
+        RoundWeaponName = null;
+        RoundWeaponChanged = null;
+    }
+
+    // ───────── 결정 ─────────
+
+    private int PickRandom() => weaponNames != null && weaponNames.Length > 0 ? UnityEngine.Random.Range(0, weaponNames.Length) : -1;
 
     private void HandleRoundStart(int roundNumber)
     {
-        IsSelecting = true;
-        pendingLock = false;
-        if (EnsureSwitcher()) ApplySelecting();   // 아직 무기가 없으면 찾는 순간 적용 (OnSwitcherReady)
+        if (round != null && round.IsFollower) return;   // 참가자는 호스트가 보낸 값 사용
+        int idx = PickRandom();
+        SetRoundWeapon(idx);
+        var ch = RoundNetworkSync.Channel;
+        if (ch != null) ch.SendRoundWeapon(idx);
     }
 
-    private void HandlePlayStart(int roundNumber)
+    /// <summary>디버그: 다음 무기로 바꿈 (호스트 / 싱글, 모두에게 적용)</summary>
+    public void DebugCycle()
     {
-        IsSelecting = false;
-        if (EnsureSwitcher()) Lock();
-        else pendingLock = true;
+        if (round != null && round.IsFollower) return;
+        if (weaponNames == null || weaponNames.Length == 0) return;
+        int idx = (RoundWeaponIndex + 1) % weaponNames.Length;
+        SetRoundWeapon(idx);
+        var ch = RoundNetworkSync.Channel;
+        if (ch != null) ch.SendRoundWeapon(idx);
+        Debug.Log($"[LoadoutSelector] 무기: {RoundWeaponName}");
     }
 
-    /// <summary>선택 중: WeaponSwitcher 입력(숫자 키/휠)을 끄고, 모든 슬롯을 열어 미리보기 가능하게</summary>
-    private void ApplySelecting()
+    /// <summary>참가자: 호스트가 정한 라운드 무기</summary>
+    public void ApplyFromHost(int index) => SetRoundWeapon(index);
+
+    private void SetRoundWeapon(int index)
     {
-        switcher.enabled = false;
-        for (int i = 0; i < switcher.Count; i++) switcher.SetAllowed(i, true);
-        switcher.Select(SelectedIndex, true);
+        if (weaponNames == null || index < 0 || index >= weaponNames.Length) return;
+        RoundWeaponIndex = index;
+        RoundWeaponName = weaponNames[index];
+        applied = false;
+        TryApply();
+        RoundWeaponChanged?.Invoke(RoundWeaponName);
     }
 
-    /// <summary>선택한 무기만 허용하고 손에 쥐어줌</summary>
-    private void Lock()
-    {
-        for (int i = 0; i < switcher.Count; i++) switcher.SetAllowed(i, true);
-        switcher.Select(SelectedIndex, true);
-        for (int i = 0; i < switcher.Count; i++)
-            if (i != SelectedIndex) switcher.SetAllowed(i, false);
-        switcher.enabled = true;   // 다른 슬롯이 잠겨 있으니 키/휠을 눌러도 바뀌지 않음
-    }
-
-    // ───────── 입력 ─────────
+    // ───────── 내 손에 적용 ─────────
 
     private void Update()
     {
-        if (!ready)
-        {
-            if (!EnsureSwitcher()) return;
-            OnSwitcherReady();
-        }
-
-        if (!IsSelecting || switcher == null) return;
-        if (PauseMenuUI.IsOpen) return;   // ESC 메뉴 중
-        var kb = Keyboard.current;
-        if (kb == null) return;
-
-        for (int i = 0; i < switcher.Count && i < NumberKeys.Length; i++)
-        {
-            if (kb[NumberKeys[i]].wasPressedThisFrame)
-            {
-                Choose(i);
-                break;
-            }
-        }
+        if (applied && switcher == null) applied = false;   // 플레이어가 다시 생성됨
+        if (!applied) TryApply();   // 내 플레이어가 늦게 스폰돼도 찾는 즉시 적용
     }
 
-    /// <summary>무기 선택 (UI 버튼에서 호출해도 됨)</summary>
-    public void Choose(int index)
+    private bool EnsureSwitcher()
     {
-        if (!EnsureSwitcher() || index < 0 || index >= switcher.Count) return;
-        SelectedIndex = index;
-        if (IsSelecting) switcher.Select(index, true);   // 미리보기
+        if (switcher != null && switcher.Count > 0) return true;
+        var local = PlayerNetworkSetup.Local;
+        if (local != null) switcher = local.GetComponentInChildren<WeaponSwitcher>(true);
+        return switcher != null && switcher.Count > 0;
     }
 
-    // ───────── 임시 UI ─────────
+    private void TryApply()
+    {
+        if (RoundWeaponIndex < 0 || !EnsureSwitcher()) return;
+        int slot = FindSlot(RoundWeaponName);
+        if (slot < 0) slot = Mathf.Clamp(RoundWeaponIndex, 0, switcher.Count - 1);
+
+        for (int i = 0; i < switcher.Count; i++) switcher.SetAllowed(i, true);
+        switcher.Select(slot, true);
+        for (int i = 0; i < switcher.Count; i++)
+            if (i != slot) switcher.SetAllowed(i, false);
+        switcher.enabled = true;   // 다른 슬롯이 잠겨 있어 키/휠로 바뀌지 않음
+        applied = true;
+    }
+
+    /// <summary>WeaponHolder에서 이름이 같은 무기 슬롯</summary>
+    private int FindSlot(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return -1;
+        for (int i = 0; i < switcher.Count; i++)
+        {
+            var w = switcher.GetWeapon(i);
+            if (w != null && string.Equals(w.WeaponName, name, StringComparison.OrdinalIgnoreCase)) return i;
+        }
+        return -1;
+    }
+
+    // ───────── UI ─────────
 
     private void OnGUI()
     {
-        if (!showUI || !IsSelecting || switcher == null) return;
+        if (!showUI || string.IsNullOrEmpty(RoundWeaponName)) return;
+        if (round == null || round.CurrentState != RoundManager.State.Intro) return;
 
         if (style == null)
-        {
-            style = new GUIStyle(GUI.skin.label)
-            {
-                alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold
-            };
-        }
+            style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
         style.fontSize = fontSize;
 
-        int n = switcher.Count;
-        float slotW = fontSize * 8f;
-        float h = fontSize * 2f;
-        float totalW = slotW * n;
-        float x = (Screen.width - totalW) * 0.5f;
-        float y = Screen.height * panelY;
-
         var old = GUI.color;
-        GUI.color = normalColor;
-        GUI.Label(new Rect(0, y - h, Screen.width, h), "SELECT WEAPON", style);
-
-        for (int i = 0; i < n; i++)
-        {
-            var w = switcher.GetWeapon(i);
-            string name = w != null ? w.WeaponName.ToUpperInvariant() : $"SLOT {i + 1}";
-            bool sel = i == SelectedIndex;
-            GUI.color = sel ? selectedColor : normalColor;
-            string text = sel ? $"▶ [{i + 1}] {name} ◀" : $"[{i + 1}] {name}";
-            GUI.Label(new Rect(x + slotW * i, y, slotW, h), text, style);
-        }
+        GUI.color = textColor;
+        float h = fontSize * 2f;
+        GUI.Label(new Rect(0, Screen.height * panelY, Screen.width, h), $"WEAPON: {RoundWeaponName.ToUpperInvariant()}", style);
         GUI.color = old;
     }
 }

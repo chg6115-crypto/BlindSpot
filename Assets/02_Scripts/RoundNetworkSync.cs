@@ -16,6 +16,7 @@ using UnityEngine;
 ///   데칼 점멸   : 호스트의 DecalBlinkManager가 점멸할 때마다 참가자도 같은 순간에 점멸
 ///   날씨        : 라운드마다 호스트가 정한 날씨 (WeatherManager)
 ///   번개        : 종류·위치·연출 시드 (LightningStorm)
+///   라운드 무기 : 모두가 같은 총 (LoadoutSelector)
 /// </summary>
 [DisallowMultipleComponent]
 public class RoundNetworkSync : NetworkBehaviour
@@ -115,7 +116,19 @@ public class RoundNetworkSync : NetworkBehaviour
         if (IsSpawned && IsServer) LightningRpc(kind, position, seed);
     }
 
+    /// <summary>호스트: 라운드 무기를 참가자에게 (LoadoutSelector가 호출)</summary>
+    public void SendRoundWeapon(int index)
+    {
+        if (IsSpawned && IsServer) RoundWeaponRpc(index);
+    }
+
     // ───────── 참가자에서 실행 ─────────
+
+    [Rpc(SendTo.NotServer)]
+    private void RoundWeaponRpc(int index)
+    {
+        if (LoadoutSelector.Instance != null) LoadoutSelector.Instance.ApplyFromHost(index);
+    }
 
     [Rpc(SendTo.NotServer)]
     private void WeatherRpc(int roundNumber, int weather)

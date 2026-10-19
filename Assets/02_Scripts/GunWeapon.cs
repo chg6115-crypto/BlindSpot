@@ -134,6 +134,14 @@ public class GunWeapon : MonoBehaviour
     [SerializeField] private Camera aimCamera;
     [SerializeField] private AudioSource audioSource;
 
+    [Header("모델")]
+    [Tooltip("1인칭 총 모델은 그림자를 만들지 않음 (3인칭 총이 그림자를 담당)")]
+    [SerializeField] private bool modelShadowsOff = true;
+    [Tooltip("모델(렌더러)들의 레이어를 Model Layer로 맞춤")]
+    [SerializeField] private bool setModelLayer = true;
+    [Tooltip("1인칭 총 모델 레이어. Default(0)면 소나 외곽선에 총 윤곽이 그려지고, 총 뒤 배경 선이 총을 뚫고 보이지 않음")]
+    [SerializeField] private int modelLayer = 0;
+
     [Header("임시 HUD")]
     [SerializeField] private bool showHud = true;
     [SerializeField] private bool showCrosshair = true;
@@ -190,6 +198,13 @@ public class GunWeapon : MonoBehaviour
         ownerController = owner.GetComponent<StarterAssets.FirstPersonController>();
 
         wallRetract = GetComponentInParent<WeaponWallRetract>(true);
+
+        if (setModelLayer)
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                if (r is MeshRenderer || r is SkinnedMeshRenderer) r.gameObject.layer = modelLayer;
+        if (modelShadowsOff)
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                if (r is MeshRenderer || r is SkinnedMeshRenderer) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         if (recoilTarget == null) recoilTarget = transform;
         if (gunAnimator == null) gunAnimator = GetComponent<Animator>();
         if (audioSource == null)

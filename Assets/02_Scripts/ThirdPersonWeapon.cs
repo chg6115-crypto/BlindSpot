@@ -5,10 +5,10 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 3인칭 몸(다른 사람이 보는 모습)의 손에 총을 쥐여준다.
 /// CharacterBody 루트에 붙인다. 오른손 소품 뼈(B-handProp.R) 아래 WeaponSocket의 자식들이 무기 모델.
-///  - 자식 이름 = 무기 이름 (Pistol / Shotgun / Sniper). GunWeapon.WeaponName과 대소문자 무시하고 비교
+///  - 자식 이름 = 무기 이름 (A3500X / SCAR-L). GunWeapon.WeaponName과 대소문자 무시하고 비교
 ///  - 플레이어: WeaponSwitcher가 무기를 바꾸면 같은 이름의 모델만 켬
 ///  - 로컬 플레이어(나): 1인칭 총이 따로 있으므로 3인칭 총은 그림자만 (Shadows Only)
-///  - 마네킹/봇(WeaponSwitcher 없음): Default Weapon을 들고 있음 ("Random"이면 랜덤)
+///  - 마네킹/봇(WeaponSwitcher 없음): 이번 라운드 무기(LoadoutSelector)를 듦. 아직 없으면 Default Weapon ("Random"이면 랜덤)
 ///  - 총의 Rendering Layer를 몸과 똑같이 맞춤 → 몸이 안 보이는 곳에서는 총도 안 보임
 ///    (총 모델은 기본값 Default라 맵 조명·스포트라이트를 받아서, 가까이 가면 총만 보이던 문제)
 /// 위치/회전은 CharacterBody 프리팹을 열고 WeaponSocket 아래 각 무기 오브젝트를 직접 맞추면 됨.
@@ -24,7 +24,7 @@ public class ThirdPersonWeapon : MonoBehaviour
     [Tooltip("WeaponSwitcher가 없을 때(마네킹/봇) 들 무기 이름. Random = 랜덤, None = 빈손")]
     [SerializeField] private string defaultWeapon = "Random";
     [Tooltip("Random일 때 고를 무기 이름")]
-    [SerializeField] private string[] randomPool = { "Shotgun", "Sniper", "Pistol" };
+    [SerializeField] private string[] randomPool = { "A3500X", "SCAR-L" };
     [Tooltip("로컬 플레이어(나)는 3인칭 총을 그림자만 보이게")]
     [SerializeField] private bool localShadowOnly = true;
     [Tooltip("총의 Rendering Layer를 몸(SkinnedMeshRenderer)과 같게 → 몸과 똑같은 조명만 받음")]
@@ -68,6 +68,9 @@ public class ThirdPersonWeapon : MonoBehaviour
 
         foreach (Transform child in socket)
             models[child.name.ToLowerInvariant()] = child.gameObject;
+
+        // 모델 자식 레이어를 소켓과 같게 (소나 외곽선에 총이 잡히지 않게)
+        foreach (var t in socket.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = socket.gameObject.layer;
 
         if (matchBodyLighting) MatchBodyRenderingLayer();
 
@@ -132,13 +135,17 @@ public class ThirdPersonWeapon : MonoBehaviour
         }
         else
         {
-            ShowDefault();
+            // 마네킹/봇: 이번 라운드 무기를 들고, 라운드가 바뀌면 따라 바꿈
+            LoadoutSelector.RoundWeaponChanged += Show;
+            if (!string.IsNullOrEmpty(LoadoutSelector.RoundWeaponName)) Show(LoadoutSelector.RoundWeaponName);
+            else ShowDefault();
         }
     }
 
     private void OnDestroy()
     {
         if (switcher != null) switcher.OnSwitched -= HandleSwitched;
+        else LoadoutSelector.RoundWeaponChanged -= Show;
     }
 
     private void HandleSwitched(int index, GunWeapon weapon) => Show(weapon != null ? weapon.WeaponName : null);

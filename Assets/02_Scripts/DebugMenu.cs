@@ -88,6 +88,7 @@ public class DebugMenu : MonoBehaviour
         Add(Key.F6, "적 봇 소환 (내 앞)", SpawnBot, null);
         Add(Key.F7, "날씨 바꾸기 (달밤→비→폭풍)", CycleWeather, WeatherState);
         Add(Key.F8, "번개 치기 (지금)", StrikeLightning, null);
+        Add(Key.F9, "무기 바꾸기 (모두 같은 총)", CycleWeapon, () => LoadoutSelector.RoundWeaponName ?? "없음");
     }
 
     private void Start()
@@ -222,6 +223,12 @@ public class DebugMenu : MonoBehaviour
 
     private static string WeatherState()
         => WeatherManager.Instance != null ? WeatherManager.Instance.Current.ToString() : "없음";
+
+    private void CycleWeapon()
+    {
+        if (LoadoutSelector.Instance != null) LoadoutSelector.Instance.DebugCycle();
+        else Debug.LogWarning("[DebugMenu] 씬에 LoadoutSelector가 없습니다.");
+    }
 
     private void StrikeLightning()
     {
