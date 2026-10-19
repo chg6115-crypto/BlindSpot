@@ -39,6 +39,8 @@ public class DecalBlink : MonoBehaviour
     private Coroutine overrideRoutine;
 
     public bool IsGlowing { get; private set; }
+    /// <summary>데칼이 실제로 화면에 켜져 있는지 (Toggle 모드는 기준값 이상일 때만). CharacterVisibility가 몸 표시에 사용</summary>
+    public bool IsVisibleNow { get; private set; }
 
     // ───────── 등록 ─────────
 
@@ -147,6 +149,7 @@ public class DecalBlink : MonoBehaviour
         if (DebugForceOn) value = 1f;   // 디버그: 항상 켜기
 
         IsGlowing = value > 0.001f;
+        IsVisibleNow = mode == BlinkMode.Fade ? IsGlowing : value > toggleThreshold;
 
         // 데칼
         float shown = value;   // 라이트에도 같은 값 사용

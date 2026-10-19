@@ -75,6 +75,9 @@ public class Health : MonoBehaviour
         renderers = GetComponentsInChildren<Renderer>(true);
         colliders = GetComponentsInChildren<Collider>(true);
         net = GetComponent<PlayerNetworkCombat>();
+
+        // 몸 표시 규칙: 다른 사람 화면에서는 데칼이 켜졌을 때만 보임 (플레이어/마네킹/봇 공통)
+        if (GetComponent<CharacterVisibility>() == null) gameObject.AddComponent<CharacterVisibility>();
     }
 
     private void Start()

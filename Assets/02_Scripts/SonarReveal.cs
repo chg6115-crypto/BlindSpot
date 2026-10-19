@@ -5,14 +5,16 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 소나(Q) 실루엣. Player_FPS 프리팹 루트에 붙인다 (SonarSkill 옆).
 ///
-///  - 내 화면에서만 동작: 내가 Q를 쓴 순간부터 펄스가 퍼지는 동안, 펄스 앞부분이 닿은 상대를 찾음
+///  - 내 화면에서만 동작: Q를 쓴 순간부터 판정 파동이 일정한 속도로 맵 전체에 퍼짐
+///    (외곽선 효과의 반경과 별개. 속도 = SonarSkill 반경 ÷ 퍼짐 시간 → 기본 초당 20m, 먼 상대일수록 늦게 보임)
+///  - 파동이 닿은 상대를 Frame Count(3)번, Frame Interval(0.2초)마다 다시 찍어서 보여줌
+///    → 끊기는 스톱모션처럼 3단계로 움직이는 모습 (총 0.6초). 각 프레임은 다음 프레임이 찍힐 때 교체
 ///  - 대상: 상대 플레이어 + F6 디버그 봇 (Mannequin 태그, 내 캐릭터, 죽은 대상은 제외)
-///  - 닿은 순간 몸 자세를 스냅샷으로 떠서 그 자리에 Hold Time 동안 유지 → Fade Time 동안 사라짐
-///    (상대가 움직여도 실루엣은 그 자리에 고정)
-///  - 벽 너머는 안 보임: ① 소나 중심 → 상대 몸으로 광선 검사 ② 셰이더 깊이 검사 (ZTest)
+///  - 벽 너머는 안 보임: ① 프레임을 찍을 때마다 소나 중심 → 상대 몸 광선 검사 ② 셰이더 깊이 검사 (ZTest)
 ///  - 들킨 쪽에는 아무 알림 없음. 네트워크 신호도 없음 (상대 위치/애니메이션은 이미 동기화됨)
 ///
-/// 스냅샷 메시는 풀에서 꺼내 재사용 (매번 새로 만들지 않음).
+/// 몸이 숨겨져 있어도(CharacterVisibility) 몸 렌더러를 직접 스냅샷하므로 그대로 보임.
+/// 스냅샷 메시는 풀에서 꺼내 재사용.
 /// </summary>
 [DisallowMultipleComponent]
 public class SonarReveal : MonoBehaviour
@@ -20,12 +22,18 @@ public class SonarReveal : MonoBehaviour
     [Header("표시")]
     [Tooltip("BlindSpot/SonarHologram 셰이더 머티리얼 (SonarHologram_Mat)")]
     [SerializeField] private Material hologramMaterial;
-    [Tooltip("실루엣이 그대로 유지되는 시간 (초)")]
-    [SerializeField, Min(0f)] private float holdTime = 0.25f;
-    [Tooltip("유지 후 사라지는 시간 (초). 0이면 바로 사라짐")]
-    [SerializeField, Min(0f)] private float fadeTime = 0.15f;
+    [Tooltip("한 상대를 몇 번 찍어서 보여줄지 (스톱모션 프레임 수)")]
+    [SerializeField, Min(1)] private int frameCount = 3;
+    [Tooltip("프레임 하나를 보여주는 시간 = 다음 프레임을 찍는 간격 (초)")]
+    [SerializeField, Min(0.02f)] private float frameInterval = 0.2f;
     [Tooltip("3인칭 총 등 일반 메시도 같이 표시")]
     [SerializeField] private bool includeMeshRenderers = true;
+
+    [Header("판정 파동")]
+    [Tooltip("판정이 퍼지는 속도 (m/초). 0이면 SonarSkill의 반경 ÷ 퍼짐 시간 (기본 20m/초)")]
+    [SerializeField, Min(0f)] private float revealSpeed = 0f;
+    [Tooltip("판정 최대 거리 (m). 맵 전체를 덮을 만큼 크게")]
+    [SerializeField, Min(1f)] private float maxRevealDistance = 150f;
 
     [Header("벽 검사")]
     [Tooltip("벽으로 판정할 레이어 (Character 레이어는 제외)")]
@@ -34,7 +42,7 @@ public class SonarReveal : MonoBehaviour
     [SerializeField] private float originHeight = 1.2f;
     [Tooltip("상대 몸에서 검사할 높이들 (발 기준, m). 하나라도 보이면 표시")]
     [SerializeField] private float[] targetHeights = { 0.5f, 1.0f, 1.6f };
-    [Tooltip("펄스가 닿았는지 볼 때 상대 기준 높이 (발 기준, m)")]
+    [Tooltip("파동이 닿았는지 볼 때 상대 기준 높이 (발 기준, m)")]
     [SerializeField] private float reachHeight = 1.0f;
 
     [Header("디버그")]
@@ -53,20 +61,30 @@ public class SonarReveal : MonoBehaviour
     private class Ghost
     {
         public readonly List<Part> parts = new List<Part>();
-        public float startTime;
+    }
+
+    /// <summary>파동이 닿은 상대 하나의 스톱모션 진행 상태</summary>
+    private class Track
+    {
+        public Health target;
+        public int framesTaken;
+        public float nextTime;   // 다음 프레임을 찍을 시각 (마지막 프레임 이후엔 사라질 시각)
+        public Ghost ghost;      // 지금 보여주는 프레임 (가려졌으면 null)
+        public Vector3 origin;   // 이 상대를 잡은 소나 중심 (벽 검사용)
     }
 
     private SonarSkill skill;
     private Health myHealth;
 
-    // 진행 중인 펄스
+    // 진행 중인 판정 파동
     private bool pulseActive;
     private Vector3 pulseOrigin;
-    private float pulseRadius, pulseExpand, pulseStart;
+    private float pulseSpeed, pulseStart;
     private readonly List<Health> candidates = new List<Health>();
 
-    // 표시 중인 실루엣
-    private readonly List<Ghost> ghosts = new List<Ghost>();
+    // 스톱모션 진행 중인 상대들
+    private readonly List<Track> tracks = new List<Track>();
+    private readonly Stack<Track> trackPool = new Stack<Track>();
     private readonly Stack<Ghost> ghostPool = new Stack<Ghost>();
     private readonly Stack<Mesh> meshPool = new Stack<Mesh>();
     private readonly List<Mesh> allMeshes = new List<Mesh>();
@@ -95,7 +113,7 @@ public class SonarReveal : MonoBehaviour
         if (skill != null) skill.OnUsed -= HandleSonarUsed;
         pulseActive = false;
         candidates.Clear();
-        for (int i = ghosts.Count - 1; i >= 0; i--) ReleaseGhost(i);
+        for (int i = tracks.Count - 1; i >= 0; i--) EndTrack(i);
     }
 
     private void OnDestroy()
@@ -119,20 +137,19 @@ public class SonarReveal : MonoBehaviour
 
         pulseActive = true;
         pulseOrigin = skill.LastOrigin;
-        pulseRadius = skill.Radius;
-        pulseExpand = Mathf.Max(0.01f, skill.ExpandTime);
+        pulseSpeed = revealSpeed > 0f ? revealSpeed : skill.Radius / Mathf.Max(0.01f, skill.ExpandTime);
         pulseStart = Time.time;
 
         // 대상 후보: 마네킹 / 나 / 죽은 대상 제외
         candidates.Clear();
-        var all = FindObjectsByType<Health>(FindObjectsInactive.Exclude);
-        foreach (var h in all)
+        foreach (var h in FindObjectsByType<Health>(FindObjectsInactive.Exclude))
         {
             if (!IsValidTarget(h)) continue;
+            if (HasTrack(h)) continue;   // 이미 스톱모션 중이면 중복 X
             candidates.Add(h);
         }
 
-        if (verboseLog) Debug.Log($"[SonarReveal] 소나 사용: 후보 {candidates.Count}명", this);
+        if (verboseLog) Debug.Log($"[SonarReveal] 소나 사용: 후보 {candidates.Count}명, 속도 {pulseSpeed:0.#}m/s", this);
     }
 
     private bool IsValidTarget(Health h)
@@ -143,19 +160,25 @@ public class SonarReveal : MonoBehaviour
         return true;
     }
 
+    private bool HasTrack(Health h)
+    {
+        foreach (var t in tracks) if (t.target == h) return true;
+        return false;
+    }
+
     // ───────── 매 프레임 ─────────
 
     private void LateUpdate()
     {
         if (pulseActive) UpdatePulse();
+        UpdateTracks();
         DrawGhosts();
     }
 
+    /// <summary>판정 파동: 일정한 속도로 퍼지면서 닿은 상대의 스톱모션 시작</summary>
     private void UpdatePulse()
     {
-        // SoundPulseManager와 같은 퍼짐 곡선 (ease-out)
-        float e = Mathf.Clamp01((Time.time - pulseStart) / pulseExpand);
-        float front = pulseRadius * (1f - (1f - e) * (1f - e));
+        float front = pulseSpeed * (Time.time - pulseStart);
 
         for (int i = candidates.Count - 1; i >= 0; i--)
         {
@@ -163,27 +186,73 @@ public class SonarReveal : MonoBehaviour
             if (!IsValidTarget(h)) { candidates.RemoveAt(i); continue; }
 
             Vector3 p = h.transform.position + Vector3.up * reachHeight;
-            float dist = Vector3.Distance(pulseOrigin, p);
-            if (dist > front) continue;   // 아직 안 닿음
+            if (Vector3.Distance(pulseOrigin, p) > front) continue;   // 아직 안 닿음
 
             candidates.RemoveAt(i);
-            if (HasLineOfSight(h)) Snapshot(h);
-            else if (verboseLog) Debug.Log($"[SonarReveal] {h.name}: 벽에 가려짐", this);
+            StartTrack(h);
         }
 
-        if (e >= 1f)
+        if (front >= maxRevealDistance || candidates.Count == 0)
         {
-            // 끝까지 퍼졌는데 못 닿은 대상 = 범위 밖
             candidates.Clear();
             pulseActive = false;
         }
     }
 
+    private void StartTrack(Health h)
+    {
+        var t = trackPool.Count > 0 ? trackPool.Pop() : new Track();
+        t.target = h;
+        t.framesTaken = 0;
+        t.nextTime = Time.time;   // 바로 첫 프레임
+        t.ghost = null;
+        t.origin = pulseOrigin;
+        tracks.Add(t);
+    }
+
+    /// <summary>스톱모션: Frame Interval마다 이전 프레임을 지우고 새로 찍음</summary>
+    private void UpdateTracks()
+    {
+        float now = Time.time;
+        for (int i = tracks.Count - 1; i >= 0; i--)
+        {
+            var t = tracks[i];
+            if (now < t.nextTime) continue;
+
+            ReleaseGhost(t.ghost);
+            t.ghost = null;
+
+            // 마지막 프레임까지 보여줬으면 종료
+            if (t.framesTaken >= frameCount) { EndTrack(i); continue; }
+
+            t.framesTaken++;
+            t.nextTime += frameInterval;
+            if (t.nextTime < now) t.nextTime = now + frameInterval;   // 프레임이 많이 밀렸을 때
+
+            if (!IsValidTarget(t.target)) { EndTrack(i); continue; }   // 죽음 / 나감
+
+            if (HasLineOfSight(t.target, t.origin))
+                t.ghost = Snapshot(t.target);
+            else if (verboseLog)
+                Debug.Log($"[SonarReveal] {t.target.name}: 프레임 {t.framesTaken} 벽에 가려짐", this);
+        }
+    }
+
+    private void EndTrack(int index)
+    {
+        var t = tracks[index];
+        ReleaseGhost(t.ghost);
+        t.ghost = null;
+        t.target = null;
+        tracks.RemoveAt(index);
+        trackPool.Push(t);
+    }
+
     // ───────── 벽 검사 ─────────
 
-    private bool HasLineOfSight(Health target)
+    private bool HasLineOfSight(Health target, Vector3 origin)
     {
-        Vector3 from = pulseOrigin + Vector3.up * originHeight;
+        Vector3 from = origin + Vector3.up * originHeight;
         foreach (float height in targetHeights)
         {
             Vector3 to = target.transform.position + Vector3.up * height;
@@ -212,18 +281,22 @@ public class SonarReveal : MonoBehaviour
 
     // ───────── 스냅샷 ─────────
 
-    private void Snapshot(Health target)
+    private Ghost Snapshot(Health target)
     {
         var ghost = ghostPool.Count > 0 ? ghostPool.Pop() : new Ghost();
         ghost.parts.Clear();
-        ghost.startTime = Time.time;
 
+        // 몸 렌더러 목록: CharacterVisibility가 있으면 그 목록 (숨겨진 상태여도 찍음)
         rendererBuffer.Clear();
-        target.GetComponentsInChildren(false, rendererBuffer);
+        var vis = target.GetComponent<CharacterVisibility>();
+        bool fromVisibility = vis != null && vis.BodyRenderers.Count > 0;
+        if (fromVisibility) { foreach (var r in vis.BodyRenderers) rendererBuffer.Add(r); }
+        else target.GetComponentsInChildren(false, rendererBuffer);
 
         foreach (var r in rendererBuffer)
         {
-            if (r == null || !r.enabled || r.forceRenderingOff) continue;
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+            if (!fromVisibility && r.forceRenderingOff) continue;   // 목록이 없을 때만: 숨겨진 1인칭 총 등 제외
             if (r.shadowCastingMode == ShadowCastingMode.ShadowsOnly) continue;
 
             if (r is SkinnedMeshRenderer smr)
@@ -256,11 +329,11 @@ public class SonarReveal : MonoBehaviour
         if (ghost.parts.Count == 0)
         {
             ghostPool.Push(ghost);
-            return;
+            return null;
         }
 
-        ghosts.Add(ghost);
-        if (verboseLog) Debug.Log($"[SonarReveal] {target.name} 실루엣 표시 (메시 {ghost.parts.Count}개)", this);
+        if (verboseLog) Debug.Log($"[SonarReveal] {target.name} 프레임 표시 (메시 {ghost.parts.Count}개)", this);
+        return ghost;
     }
 
     private Mesh GetMesh()
@@ -272,13 +345,12 @@ public class SonarReveal : MonoBehaviour
         return m;
     }
 
-    private void ReleaseGhost(int index)
+    private void ReleaseGhost(Ghost g)
     {
-        var g = ghosts[index];
+        if (g == null) return;
         foreach (var part in g.parts)
             if (part.pooled && part.mesh != null) meshPool.Push(part.mesh);
         g.parts.Clear();
-        ghosts.RemoveAt(index);
         ghostPool.Push(g);
     }
 
@@ -286,27 +358,21 @@ public class SonarReveal : MonoBehaviour
 
     private void DrawGhosts()
     {
-        if (ghosts.Count == 0 || hologramMaterial == null) return;
+        if (tracks.Count == 0 || hologramMaterial == null) return;
 
-        float life = holdTime + fadeTime;
-        for (int i = ghosts.Count - 1; i >= 0; i--)
+        mpb.SetFloat(AlphaId, 1f);
+        var rp = new RenderParams(hologramMaterial)
         {
-            var g = ghosts[i];
-            float age = Time.time - g.startTime;
-            if (age >= life) { ReleaseGhost(i); continue; }
+            matProps = mpb,
+            shadowCastingMode = ShadowCastingMode.Off,
+            receiveShadows = false,
+            layer = 0
+        };
 
-            float alpha = age <= holdTime || fadeTime <= 0f ? 1f : 1f - (age - holdTime) / fadeTime;
-            mpb.SetFloat(AlphaId, alpha);
-
-            var rp = new RenderParams(hologramMaterial)
-            {
-                matProps = mpb,
-                shadowCastingMode = ShadowCastingMode.Off,
-                receiveShadows = false,
-                layer = 0
-            };
-
-            foreach (var part in g.parts)
+        foreach (var t in tracks)
+        {
+            if (t.ghost == null) continue;
+            foreach (var part in t.ghost.parts)
                 for (int s = 0; s < part.subMeshCount; s++)
                     Graphics.RenderMesh(rp, part.mesh, s, part.matrix);
         }

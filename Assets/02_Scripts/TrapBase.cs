@@ -11,6 +11,8 @@ using UnityEngine.Rendering.Universal;
 ///  - 발동 시점부터 Cooldown이 지나면 다시 작동. 범위 안에 계속 서 있으면 재발동
 ///  - Victim Reveal 옵션으로 걸린 플레이어의 데칼도 드러낼 수 있음 (프리팹마다 선택)
 ///  - 디버그: TrapBase.DebugShowAll = true 이면 대기 중에도 데칼이 항상 보임 (TrapSpawner 8키)
+///  - 라이트 범위(Light Range)와 밟는 범위 배율(Trigger Size Multiplier)은 시작할 때 적용 (프리팹 값 대신)
+///  - 라이트가 켜져 있는 동안 범위 안 캐릭터는 몸이 보임 → 라이트에 RevealLight를 자동으로 붙임
 ///
 /// 데칼 표시는 머티리얼을 건드리지 않고 Projector 활성화 + Fade Factor로 제어한다.
 /// (트랩 머티리얼의 Glow는 1로 고정해 둘 것)
@@ -35,6 +37,18 @@ public class TrapBase : MonoBehaviour
     [SerializeField] private bool singleUse = false;
     [Tooltip("발동한 순간부터 다시 작동하기까지의 시간 (초). 서 있는 사람은 이 간격으로 반복 노출")]
     [SerializeField, Min(0f)] private float cooldown = 10f;
+
+    [Header("범위")]
+    [Tooltip("라이트 범위 (m). 프리팹의 Point Light Range 대신 사용. 0이면 프리팹 값 그대로")]
+    [SerializeField, Min(0f)] private float lightRange = 6f;
+    [Tooltip("밟는 범위(트리거 콜라이더) 배율. 1 = 프리팹 크기 그대로, 0.5 = 절반")]
+    [SerializeField, Range(0.1f, 2f)] private float triggerSizeMultiplier = 0.5f;
+
+    [Header("캐릭터 노출")]
+    [Tooltip("라이트가 켜져 있는 동안 범위 안 캐릭터의 몸을 보이게")]
+    [SerializeField] private bool revealBodiesInLight = true;
+    [Tooltip("라이트가 이 비율 이상 밝을 때만 몸이 보임 (꺼지는 중 어두워지면 다시 숨김)")]
+    [SerializeField, Range(0f, 1f)] private float revealMinLight = 0.15f;
 
     [Header("밝기")]
     [Tooltip("발동 전 데칼 불투명도 (0이면 완전히 안 보임)")]
@@ -72,6 +86,39 @@ public class TrapBase : MonoBehaviour
     /// <summary>디버그: 모든 트랩 데칼을 항상 보이게</summary>
     public static bool DebugShowAll;
 
+    private bool rangesApplied;
+
+    private void ApplyRanges()
+    {
+        if (rangesApplied) return;
+        rangesApplied = true;
+
+        if (glowLight != null)
+        {
+            if (lightRange > 0f) glowLight.range = lightRange;
+
+            // 라이트가 켜져 있는 동안 범위 안 캐릭터 노출 (+ 캐릭터 몸도 비추게)
+            if (revealBodiesInLight)
+            {
+                var reveal = glowLight.GetComponent<RevealLight>();
+                if (reveal == null) reveal = glowLight.gameObject.AddComponent<RevealLight>();
+                reveal.MinIntensity = lightIntensity * revealMinLight;
+            }
+        }
+
+        if (!Mathf.Approximately(triggerSizeMultiplier, 1f))
+        {
+            foreach (var c in GetComponentsInChildren<Collider>(true))
+            {
+                if (!c.isTrigger) continue;
+                if (c is SphereCollider sc) sc.radius *= triggerSizeMultiplier;
+                else if (c is CapsuleCollider cc) cc.radius *= triggerSizeMultiplier;
+                else if (c is BoxCollider bc)
+                    bc.size = new Vector3(bc.size.x * triggerSizeMultiplier, bc.size.y, bc.size.z * triggerSizeMultiplier);
+            }
+        }
+    }
+
     /// <summary>대기 상태일 때의 데칼 밝기 (디버그 표시 중이면 1)</summary>
     private float IdleValue => DebugShowAll ? 1f : idleGlow;
 
@@ -83,8 +130,14 @@ public class TrapBase : MonoBehaviour
 
     // ───────── Unity ─────────
 
+    private void Awake()
+    {
+        ApplyRanges();
+    }
+
     private void OnEnable()
     {
+        ApplyRanges();
         triggered = false;
         occupants.Clear();
         SetDecal(IdleValue);
