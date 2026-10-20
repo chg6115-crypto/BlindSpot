@@ -5,11 +5,13 @@ using UnityEngine.Audio;
 /// <summary>
 /// 총알 착탄 이펙트 / 탄흔 / 총구 화염. 씬에 하나 (GameManager 아래 등).
 ///  - 표면(SurfaceType)별 착탄 이펙트: Stone / Metal / Wood / Flesh (ParticlePack Weapon Effects)
+///    Spawn Particles를 끄면 파티클 없이 탄흔(+소리)만 남김 (기본: 전부 끔)
 ///  - 탄흔: 맞은 면에 작은 판을 붙여 라운드 끝까지 남김 (최대 Max Decals개, 넘으면 오래된 것부터 재사용)
 ///    탄흔 그림은 각 착탄 프리팹 안의 "Decal" 파티클 머티리얼을 그대로 사용. 사람(Flesh)은 탄흔 없음
 ///  - 총구 화염: 쏠 때 총구에서 (Muzzle Flash Prefab)
 ///  - 전부 미리 만들어 두고 돌려 씀 (오브젝트 풀링) → 연사해도 생성/삭제 없음
 ///  - 라운드가 시작되면 탄흔 전부 지움
+///  - 착탄 프리팹 루트의 데모용 구체(MeshRenderer + Collider)는 풀에서 꺼둠
 /// </summary>
 [DisallowMultipleComponent]
 public class ImpactEffects : MonoBehaviour
@@ -19,8 +21,10 @@ public class ImpactEffects : MonoBehaviour
     [System.Serializable]
     public class Surface
     {
-        [Tooltip("착탄 이펙트 프리팹")]
+        [Tooltip("착탄 이펙트 프리팹 (탄흔 머티리얼은 이 프리팹의 \"Decal\" 자식에서 가져옴)")]
         public GameObject prefab;
+        [Tooltip("착탄 파티클(파편·먼지·피 안개)을 띄울지. 끄면 탄흔만")]
+        public bool spawnParticles = false;
         [Tooltip("탄흔 크기 (최소~최대, m). 0이면 탄흔 없음")]
         public Vector2 decalSize = new Vector2(0.1f, 0.15f);
         [Tooltip("착탄 소리 (여러 개면 랜덤). 비우면 없음")]
@@ -50,6 +54,10 @@ public class ImpactEffects : MonoBehaviour
     [SerializeField, Min(1)] private int muzzlePoolSize = 8;
     [SerializeField, Min(0.1f)] private float muzzleFlashScale = 1f;
 
+    [Header("수명")]
+    [Tooltip("이펙트를 재생하고 이 시간(초) 뒤에 꺼서 풀로 돌려놓음")]
+    [SerializeField, Min(0.1f)] private float effectLifetime = 2f;
+
     [Header("소리")]
     [SerializeField, Range(0f, 1f)] private float volume = 0.7f;
     [SerializeField, Min(1f)] private float hearDistance = 20f;
@@ -64,6 +72,8 @@ public class ImpactEffects : MonoBehaviour
     private AudioSource[] audioPool;
     private int audioNext;
     private Transform poolRoot;
+    private readonly Dictionary<GameObject, float> activeUntil = new Dictionary<GameObject, float>();
+    private readonly List<GameObject> expired = new List<GameObject>();
     private RoundManager hookedRound;
 
     // ───────── 초기화 ─────────
@@ -111,6 +121,17 @@ public class ImpactEffects : MonoBehaviour
             hookedRound = rm;
             if (rm != null) rm.OnRoundStart += HandleRoundStart;
         }
+
+        // 수명이 끝난 이펙트 끄기
+        if (activeUntil.Count == 0) return;
+        float now = Time.time;
+        expired.Clear();
+        foreach (var kv in activeUntil) if (now >= kv.Value) expired.Add(kv.Key);
+        foreach (var go in expired)
+        {
+            activeUntil.Remove(go);
+            if (go != null) go.SetActive(false);
+        }
     }
 
     private void HandleRoundStart(int round) => ClearDecals();
@@ -118,6 +139,12 @@ public class ImpactEffects : MonoBehaviour
     private void BuildSurfacePool(Surface s, float scale)
     {
         if (s.prefab == null) return;
+
+        // 탄흔 머티리얼: 프리팹 안 "Decal" 파티클의 머티리얼
+        foreach (var r in s.prefab.GetComponentsInChildren<ParticleSystemRenderer>(true))
+            if (r.gameObject.name == "Decal" && r.sharedMaterial != null) { s.decalMaterial = r.sharedMaterial; break; }
+
+        if (!s.spawnParticles) return;   // 파티클 없이 탄흔만 → 이펙트 풀 안 만듦
         s.pool = new GameObject[poolPerSurface];
         for (int i = 0; i < poolPerSurface; i++)
         {
@@ -128,21 +155,18 @@ public class ImpactEffects : MonoBehaviour
             foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
             {
                 if (ps.gameObject.name != "Decal") continue;
-                if (s.decalMaterial == null)
-                {
-                    var r = ps.GetComponent<ParticleSystemRenderer>();
-                    if (r != null) s.decalMaterial = r.sharedMaterial;
-                }
-                ps.gameObject.SetActive(false);
+                ps.gameObject.SetActive(false);   // 3초짜리 탄흔 파티클 대신 오래 남는 탄흔 사용
             }
             PrepareEffect(go);
             s.pool[i] = go;
         }
     }
 
-    /// <summary>반복 재생 끄고 대기 상태로</summary>
+    /// <summary>반복 재생 끄고 대기 상태로 (데모용 구체 메시·콜라이더는 끔)</summary>
     private static void PrepareEffect(GameObject go)
     {
+        foreach (var mr in go.GetComponentsInChildren<MeshRenderer>(true)) mr.enabled = false;
+        foreach (var col in go.GetComponentsInChildren<Collider>(true)) col.enabled = false;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
         {
             var main = ps.main;
@@ -242,10 +266,13 @@ public class ImpactEffects : MonoBehaviour
 
     // ───────── 내부 ─────────
 
-    private static void Play(GameObject go, Vector3 pos, Quaternion rot)
+    private void Play(GameObject go, Vector3 pos, Quaternion rot)
     {
+        // 끈 상태에서 옮겨야 이전 위치에서 새 위치까지 파티클이 줄줄이 생기지 않음
+        go.SetActive(false);
         go.transform.SetPositionAndRotation(pos, rot);
         go.SetActive(true);
+        activeUntil[go] = Time.time + effectLifetime;
         foreach (var ps in go.GetComponentsInChildren<ParticleSystem>())
         {
             ps.Clear(false);

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 47ccd20a736c25542ab3cabba642aacc
+timeCreated: 1473933391
+licenseType: Store
+NativeFormatImporter:
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 127325
+  packageName: Particle Pack | Starter Assets
+  packageVersion: 3.3
+  assetPath: Assets/UnityTechnologies/ParticlePack/EffectExamples/Weapon Effects/Materials/FleshSurface.mat
+  uploadId: 1015842

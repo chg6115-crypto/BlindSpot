@@ -29,7 +29,6 @@ using UnityEngine.InputSystem;
 public class GunWeapon : MonoBehaviour
 {
     public enum AmmoMode { Magazine, Cooldown, Battery }
-    public enum ImpactSpawnMode { HitPoint, FromMuzzle }
 
     [Header("기본")]
     [SerializeField] private string weaponName = "PISTOL";
@@ -93,23 +92,9 @@ public class GunWeapon : MonoBehaviour
     [SerializeField, Min(0.1f)] private float flashRange = 10f;
     [SerializeField, Min(0.01f)] private float flashDuration = 0.07f;
 
-    [Header("피격 이펙트")]
-    [Tooltip("이펙트 생성 방식\n HitPoint: 맞은 지점에서 터짐 (ZapBeam이 붙어 있으면 맞은 지점→총구 빔)\n FromMuzzle: 총구에서 맞은 지점 방향으로 생성 (날아가는 탄 이펙트, 예: PlasmaShot)")]
-    [SerializeField] private ImpactSpawnMode impactSpawnMode = ImpactSpawnMode.HitPoint;
-    [Tooltip("생성할 이펙트 프리팹 (비우면 생성 안 함)")]
-    [SerializeField] private GameObject impactPrefab;
-    [Tooltip("생성 후 몇 초 뒤 삭제 (그을음이 남아 있는 시간보다 길게)")]
-    [SerializeField, Min(0.1f)] private float impactLifetime = 3f;
-    [Tooltip("맞은 면 방향으로 이펙트를 세움 (벽에 맞으면 벽에서 튀어나오게)")]
-    [SerializeField] private bool alignToSurface = true;
-    [Tooltip("이펙트를 표면에서 띄우는 거리 (벽 속에 묻히지 않게)")]
-    [SerializeField, Min(0f)] private float impactSurfaceOffset = 0.01f;
-    [Tooltip("총구 위치 (빔이 시작되는 곳). 비우면 Flash Local Offset 위치 사용")]
+    [Header("총구")]
+    [Tooltip("총구 위치 (총구 화염이 나오는 곳). 비우면 Flash Local Offset 위치 사용")]
     [SerializeField] private Transform muzzlePoint;
-    [Tooltip("아무것도 안 맞았을 때도 이펙트를 보여줄지 (ZapBeam 빔 / FromMuzzle 탄)")]
-    [SerializeField] private bool beamOnMiss = true;
-    [Tooltip("FromMuzzle 탄 이펙트를 강제로 지우는 시간 (초). 탄이 멀리 날아가니 Impact Lifetime보다 길게")]
-    [SerializeField, Min(0.1f)] private float projectileLifetime = 6f;
 
     [Header("소리 / 소나")]
     [SerializeField] private AudioClip fireClip;
@@ -562,71 +547,12 @@ public class GunWeapon : MonoBehaviour
         return m != null ? m.position : MuzzlePosition;
     }
 
-    /// <summary>
-    /// 날아가는 탄 이펙트가 사거리(또는 맞은 지점)까지만 날아가게 루트 파티클 수명을 맞춤.
-    /// 수명 = 거리 / 탄 속도. 맞았을 때는 충돌 이펙트가 터지도록 조금 여유를 줌.
-    /// </summary>
-    private void LimitProjectileRange(GameObject shot, float distance, bool hit)
-    {
-        var ps = shot.GetComponent<ParticleSystem>();
-        if (ps == null) return;
-
-        var main = ps.main;
-        float speed = main.startSpeed.constantMax;
-        if (speed < 0.01f) return;
-
-        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        main.startLifetime = distance / speed + (hit ? 0.05f : 0f);
-        ps.Play(true);
-    }
-
     /// <param name="surface">0 = 안 맞음, 1 + SurfaceKind</param>
     private void SpawnImpact(Vector3 point, Vector3 normal, byte surface)
     {
-        bool hit = surface > 0;
-
-        // 표면별 착탄 이펙트 + 탄흔 (씬에 ImpactEffects가 있으면 이것만 사용, 빔/탄 이펙트 없음)
-        if (ImpactEffects.Instance != null)
-        {
-            if (hit) ImpactEffects.Instance.PlayImpact(point, normal, (SurfaceKind)(surface - 1));
-            return;
-        }
-
-        if (impactPrefab == null) return;
-
-        // 총구에서 날아가는 탄 이펙트 (PlasmaShot 등): 총구에서 맞은 지점을 바라보게 생성
-        if (impactSpawnMode == ImpactSpawnMode.FromMuzzle)
-        {
-            if (!hit && !beamOnMiss) return;
-            Vector3 from = MuzzlePosition;
-            Vector3 dir = point - from;
-            if (dir.sqrMagnitude < 0.0001f) dir = transform.forward;
-            GameObject shot = Instantiate(impactPrefab, from, Quaternion.LookRotation(dir.normalized));
-            LimitProjectileRange(shot, dir.magnitude, hit);
-            Destroy(shot, projectileLifetime);
-            return;
-        }
-
-        // ZapBeam이 붙은 프리팹: 총구 → 맞은 지점 빔
-        var beamOnPrefab = impactPrefab.GetComponent<ZapBeam>();
-        if (beamOnPrefab != null)
-        {
-            if (!hit && !beamOnMiss) return;
-            GameObject beamFx = Instantiate(impactPrefab, point, Quaternion.identity);
-            Vector3 end = hit ? point + normal * impactSurfaceOffset : point;
-            beamFx.GetComponent<ZapBeam>().Fire(MuzzlePosition, end, hit);
-            Destroy(beamFx, impactLifetime);
-            return;
-        }
-
-        // 일반 피격 이펙트: 맞았을 때만, 맞은 면 방향으로
-        if (!hit) return;
-        Quaternion rot = alignToSurface
-            ? Quaternion.FromToRotation(Vector3.up, normal)
-            : Quaternion.identity;
-
-        GameObject fx = Instantiate(impactPrefab, point + normal * impactSurfaceOffset, rot);
-        Destroy(fx, impactLifetime);
+        // 표면별 착탄 이펙트 + 탄흔 (씬의 ImpactEffects). 안 맞았으면 없음
+        if (surface == 0 || ImpactEffects.Instance == null) return;
+        ImpactEffects.Instance.PlayImpact(point, normal, (SurfaceKind)(surface - 1));
     }
 
     // ───────── 재장전 / 충전 ─────────

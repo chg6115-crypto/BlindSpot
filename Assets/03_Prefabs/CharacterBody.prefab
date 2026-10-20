@@ -724,6 +724,7 @@ GameObject:
   - component: {fileID: 5804431173570218301}
   - component: {fileID: 5439475562759461609}
   - component: {fileID: 5863416862648836901}
+  - component: {fileID: 5267046458509380676}
   m_Layer: 6
   m_Name: DecalLight_Face
   m_TagString: Untagged
@@ -740,7 +741,7 @@ Transform:
   m_GameObject: {fileID: 1823871657467075240}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: 0.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -755,10 +756,10 @@ Light:
   m_GameObject: {fileID: 1823871657467075240}
   m_Enabled: 0
   serializedVersion: 13
-  m_Type: 0
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Type: 2
+  m_Color: {r: 0.2, g: 0, b: 0, a: 1}
   m_Intensity: 0
-  m_Range: 2
+  m_Range: 1
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -795,7 +796,7 @@ Light:
   m_CullingMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_RenderingLayerMask: 2
+  m_RenderingLayerMask: 4294967295
   m_Lightmapping: 4
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
@@ -838,8 +839,24 @@ MonoBehaviour:
   m_Version: 4
   m_LightLayerMask: 1
   m_ShadowLayerMask: 1
-  m_RenderingLayers: 1
+  m_RenderingLayers: 4294967295
   m_ShadowRenderingLayers: 1
+--- !u!114 &5267046458509380676
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1823871657467075240}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ccab4bb495e4f4b8d6e84528a0c915c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  minIntensity: 0.01
+  lightCharacters: 1
+  ignoreRoot: {fileID: 0}
+  directionalReach: 200
 --- !u!1 &2125404626574453898
 GameObject:
   m_ObjectHideFlags: 0
@@ -984,6 +1001,7 @@ GameObject:
   - component: {fileID: 8512862965760587838}
   - component: {fileID: 1495511521450315560}
   - component: {fileID: 5285305122319253788}
+  - component: {fileID: 111325915816592589}
   m_Layer: 6
   m_Name: DecalLight_Back
   m_TagString: Untagged
@@ -1000,7 +1018,7 @@ Transform:
   m_GameObject: {fileID: 2892276035178076740}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.021, z: 0.128}
+  m_LocalPosition: {x: 0, y: 0.021, z: 0.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1015,10 +1033,10 @@ Light:
   m_GameObject: {fileID: 2892276035178076740}
   m_Enabled: 0
   serializedVersion: 13
-  m_Type: 0
-  m_Color: {r: 1, g: 0, b: 0, a: 1}
+  m_Type: 2
+  m_Color: {r: 0.2, g: 0, b: 0, a: 1}
   m_Intensity: 0
-  m_Range: 2
+  m_Range: 1
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
   m_CookieSize2D: {x: 0.5, y: 0.5}
@@ -1055,7 +1073,7 @@ Light:
   m_CullingMask:
     serializedVersion: 2
     m_Bits: 4294967295
-  m_RenderingLayerMask: 2
+  m_RenderingLayerMask: 4294967295
   m_Lightmapping: 4
   m_LightShadowCasterMode: 0
   m_AreaSize: {x: 1, y: 1}
@@ -1098,8 +1116,24 @@ MonoBehaviour:
   m_Version: 4
   m_LightLayerMask: 1
   m_ShadowLayerMask: 1
-  m_RenderingLayers: 1
+  m_RenderingLayers: 4294967295
   m_ShadowRenderingLayers: 1
+--- !u!114 &111325915816592589
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2892276035178076740}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ccab4bb495e4f4b8d6e84528a0c915c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  minIntensity: 0.01
+  lightCharacters: 1
+  ignoreRoot: {fileID: 0}
+  directionalReach: 200
 --- !u!1 &2976572366212360126
 GameObject:
   m_ObjectHideFlags: 0
@@ -1564,7 +1598,7 @@ MonoBehaviour:
   - {fileID: 1495511521450315560}
   - {fileID: 5439475562759461609}
   lightIdleIntensity: 0
-  lightGlowIntensity: 1
+  lightGlowIntensity: 0.2
 --- !u!114 &8121836706224825957
 MonoBehaviour:
   m_ObjectHideFlags: 0
