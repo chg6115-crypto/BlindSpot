@@ -579,6 +579,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f6ebaa94097f3da47a01d47be07f26f3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1671394014180706848}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: f6ebaa94097f3da47a01d47be07f26f3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2651235709518388512}
   m_SourcePrefab: {fileID: 100100000, guid: f6ebaa94097f3da47a01d47be07f26f3, type: 3}
 --- !u!4 &561333498336542753 stripped
 Transform:
@@ -620,3 +623,16 @@ MonoBehaviour:
   rearEmission: {r: 6, g: 0.3, b: 0.2, a: 1}
   alarmLights: []
   revealMinIntensity: 0.05
+--- !u!114 &2651235709518388512
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901161358493538971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43ba1db39fb043269a59df692f6fa3aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  kind: 1

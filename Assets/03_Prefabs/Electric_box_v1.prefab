@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8747280614323035267}
   - component: {fileID: 460103956252454612}
   - component: {fileID: 1566765464913921107}
+  - component: {fileID: 1354330210068365420}
   m_Layer: 0
   m_Name: Electric_box_v1
   m_TagString: Untagged
@@ -112,3 +113,16 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.2119317, y: 1.4367304, z: 0.39957333}
   m_Center: {x: 0.00000011920929, y: 0, z: -0.00000023841858}
+--- !u!114 &1354330210068365420
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4084545524817571374}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 43ba1db39fb043269a59df692f6fa3aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  kind: 1

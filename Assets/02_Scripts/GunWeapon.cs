@@ -151,7 +151,8 @@ public class GunWeapon : MonoBehaviour
     public event Action<Vector3, Health> OnFired;
     public event Action OnReloadStarted;
     /// <summary>발사 연출 정보 (총, 펠릿별 맞은 지점, 면 방향, 명중 여부) - 네트워크 전달용</summary>
-    public event Action<GunWeapon, Vector3[], Vector3[], bool[]> OnShotFx;
+    /// <param>표면 코드: 0 = 안 맞음, 1 + SurfaceKind (1 Stone, 2 Metal, 3 Wood, 4 Flesh)</param>
+    public event Action<GunWeapon, Vector3[], Vector3[], byte[]> OnShotFx;
     /// <summary>어떤 총이든 총알이 닿은 지점들 (내가 쏜 것 + 다른 사람 화면 재생 모두). 자동차 경보 등 환경 반응용</summary>
     public static event Action<Vector3[]> AnyShotImpact;
 
@@ -411,20 +412,25 @@ public class GunWeapon : MonoBehaviour
             flashLight.enabled = true;
             flashOffTime = Time.time + flashDuration;
         }
+        if (ImpactEffects.Instance != null)
+        {
+            Transform aim = aimCamera != null ? aimCamera.transform : transform;
+            ImpactEffects.Instance.PlayMuzzleFlash(MuzzlePosition, aim.forward);
+        }
 
         // 히트스캔 (산탄이면 여러 발). 피해는 대상별로 합쳐서 한 번만 보냄 (네트워크 메시지 절약)
         Vector3 firstPoint = Vector3.zero;
         Health firstHealth = null;
         var fxPoints = new Vector3[pelletCount];
         var fxNormals = new Vector3[pelletCount];
-        var fxHits = new bool[pelletCount];
+        var fxHits = new byte[pelletCount];
         damageBuffer.Clear();
         for (int i = 0; i < pelletCount; i++)
         {
-            Health h = Shoot(out Vector3 point, out Vector3 normal, out bool didHit);
+            Health h = Shoot(out Vector3 point, out Vector3 normal, out byte surface);
             fxPoints[i] = point;
             fxNormals[i] = normal;
-            fxHits[i] = didHit;
+            fxHits[i] = surface;
             if (i == 0) { firstPoint = point; firstHealth = h; }
             if (h != null) damageBuffer[h] = (damageBuffer.TryGetValue(h, out float d) ? d : 0f) + damage;
         }
@@ -465,7 +471,7 @@ public class GunWeapon : MonoBehaviour
         }
     }
 
-    private Health Shoot(out Vector3 hitPoint, out Vector3 hitNormal, out bool didHit)
+    private Health Shoot(out Vector3 hitPoint, out Vector3 hitNormal, out byte surface)
     {
         Transform cam = aimCamera != null ? aimCamera.transform : transform;
         Vector3 origin = cam.position;
@@ -499,10 +505,11 @@ public class GunWeapon : MonoBehaviour
         }
 
         hitNormal = bestNormal;
-        didHit = bestCol != null;
+        bool didHit = bestCol != null;
+        surface = didHit ? (byte)(1 + (int)SurfaceType.Resolve(bestCol)) : (byte)0;
 
-        // 피격 이펙트 / 빔
-        SpawnImpact(hitPoint, bestNormal, didHit);
+        // 착탄 이펙트
+        SpawnImpact(hitPoint, bestNormal, surface);
 
         if (debugDrawRay)
             Debug.DrawLine(origin, hitPoint, bestCol != null ? Color.red : Color.yellow, 1f);
@@ -514,9 +521,17 @@ public class GunWeapon : MonoBehaviour
     /// 다른 플레이어가 쏜 총의 연출만 재생 (판정/탄약/반동 없음). PlayerNetworkCombat이 호출.
     /// 소리는 쏜 사람 위치에서 3D로 들림 (PlayerNetworkSetup이 다른 플레이어 AudioSource를 3D로 설정)
     /// </summary>
-    public void PlayRemoteShot(Vector3[] points, Vector3[] normals, bool[] hitFlags)
+    public void PlayRemoteShot(Vector3[] points, Vector3[] normals, byte[] surfaces)
     {
         AnyShotImpact?.Invoke(points);
+
+        // 총구 화염: 다른 사람 화면에서는 3인칭 총구 (관전 중이면 1인칭 총구)
+        if (ImpactEffects.Instance != null)
+        {
+            Vector3 from = RemoteMuzzlePosition();
+            Vector3 to = points != null && points.Length > 0 ? points[0] : from + owner.forward;
+            ImpactEffects.Instance.PlayMuzzleFlash(from, to - from);
+        }
 
         if (fireClip != null && audioSource != null && audioSource.isActiveAndEnabled)
         {
@@ -529,13 +544,23 @@ public class GunWeapon : MonoBehaviour
         for (int i = 0; i < points.Length; i++)
         {
             Vector3 n = normals != null && i < normals.Length ? normals[i] : Vector3.up;
-            bool h = hitFlags != null && i < hitFlags.Length && hitFlags[i];
-            SpawnImpact(points[i], n, h);
+            byte sf = surfaces != null && i < surfaces.Length ? surfaces[i] : (byte)0;
+            SpawnImpact(points[i], n, sf);
         }
     }
 
     /// <summary>총구 위치 (Muzzle Point가 없으면 Flash Local Offset)</summary>
     public Vector3 MuzzlePosition => muzzlePoint != null ? muzzlePoint.position : transform.TransformPoint(flashLocalOffset);
+
+    /// <summary>다른 사람이 쏜 총의 총구: 3인칭 총의 MuzzlePoint (관전 중이면 1인칭 총구)</summary>
+    private Vector3 RemoteMuzzlePosition()
+    {
+        var net = owner != null ? owner.GetComponent<PlayerNetworkSetup>() : null;
+        if (net != null && net.IsSpectated) return MuzzlePosition;
+        var tpw = owner != null ? owner.GetComponentInChildren<ThirdPersonWeapon>() : null;
+        var m = tpw != null ? tpw.CurrentMuzzle : null;
+        return m != null ? m.position : MuzzlePosition;
+    }
 
     /// <summary>
     /// 날아가는 탄 이펙트가 사거리(또는 맞은 지점)까지만 날아가게 루트 파티클 수명을 맞춤.
@@ -555,8 +580,18 @@ public class GunWeapon : MonoBehaviour
         ps.Play(true);
     }
 
-    private void SpawnImpact(Vector3 point, Vector3 normal, bool hit)
+    /// <param name="surface">0 = 안 맞음, 1 + SurfaceKind</param>
+    private void SpawnImpact(Vector3 point, Vector3 normal, byte surface)
     {
+        bool hit = surface > 0;
+
+        // 표면별 착탄 이펙트 + 탄흔 (씬에 ImpactEffects가 있으면 이것만 사용, 빔/탄 이펙트 없음)
+        if (ImpactEffects.Instance != null)
+        {
+            if (hit) ImpactEffects.Instance.PlayImpact(point, normal, (SurfaceKind)(surface - 1));
+            return;
+        }
+
         if (impactPrefab == null) return;
 
         // 총구에서 날아가는 탄 이펙트 (PlasmaShot 등): 총구에서 맞은 지점을 바라보게 생성

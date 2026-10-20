@@ -46,6 +46,25 @@ public class ThirdPersonWeapon : MonoBehaviour
 
     public string Current { get; private set; }
 
+    /// <summary>지금 들고 있는 3인칭 총의 총구 (총 프리팹 안 "MuzzlePoint", 없으면 null)</summary>
+    public Transform CurrentMuzzle
+    {
+        get
+        {
+            if (string.IsNullOrEmpty(Current)) return null;
+            string key = Current.ToLowerInvariant();
+            if (muzzles.TryGetValue(key, out var m)) return m;
+            m = null;
+            if (models.TryGetValue(key, out var go))
+                foreach (var t in go.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "MuzzlePoint") { m = t; break; }
+            muzzles[key] = m;
+            return m;
+        }
+    }
+
+    private readonly Dictionary<string, Transform> muzzles = new Dictionary<string, Transform>();
+
     private readonly Dictionary<string, GameObject> models = new Dictionary<string, GameObject>();
     private WeaponSwitcher switcher;
     private Animator animator;

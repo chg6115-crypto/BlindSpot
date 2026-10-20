@@ -10312,6 +10312,76 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 000e85201b855cb4e96692afaa50a337, type: 3}
+--- !u!1 &1952099019
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 992695476}
+  - component: {fileID: 382947329}
+  m_Layer: 0
+  m_Name: ImpactEffects
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &992695476
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1952099019}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &382947329
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1952099019}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a8c44f568ebc403f809d55ab9b1512e8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stone:
+    prefab: {fileID: 1341869769842038, guid: 8b7a1ffda5bb7474b8fae646c45ce7b4, type: 3}
+    decalSize: {x: 0.1, y: 0.15}
+    clips: []
+  metal:
+    prefab: {fileID: 1892351807075712, guid: 44be68b4fc4366142a9cd1ae1f761ea4, type: 3}
+    decalSize: {x: 0.06, y: 0.1}
+    clips: []
+  wood:
+    prefab: {fileID: 1031560401822814, guid: 3c0b5f221ea995442b9d11dc526de1c0, type: 3}
+    decalSize: {x: 0.1, y: 0.2}
+    clips: []
+  flesh:
+    prefab: {fileID: 1096893136476370, guid: 24b82347924701148a13c746edfb6b22, type: 3}
+    decalSize: {x: 0, y: 0}
+    clips: []
+  poolPerSurface: 8
+  fleshScale: 0.6
+  maxDecals: 32
+  decalOffset: 0.004
+  muzzleFlashPrefab: {fileID: 1743301284569550, guid: ad2ab49d0a2a17148bd51c93d977bdbc, type: 3}
+  muzzlePoolSize: 8
+  muzzleFlashScale: 1
+  volume: 0.7
+  hearDistance: 20
+  audioSourceCount: 6
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -10337,3 +10407,4 @@ SceneRoots:
   - {fileID: 1227574824}
   - {fileID: 1579049464}
   - {fileID: 544405432}
+  - {fileID: 992695476}

@@ -287,7 +287,7 @@ public class PlayerNetworkCombat : NetworkBehaviour
 
     // ───────── 사격 연출 ─────────
 
-    private void HandleLocalShot(GunWeapon gun, Vector3[] points, Vector3[] normals, bool[] hits)
+    private void HandleLocalShot(GunWeapon gun, Vector3[] points, Vector3[] normals, byte[] hits)
     {
         if (!IsOwner || !IsSpawned || switcher == null) return;
 
@@ -301,7 +301,7 @@ public class PlayerNetworkCombat : NetworkBehaviour
 
     /// <summary>쏜 사람 → 나머지 모두: 빔 / 피격 이펙트 / 총소리 재생</summary>
     [Rpc(SendTo.NotMe, Delivery = RpcDelivery.Unreliable)]
-    private void ShotFxRpc(int index, Vector3[] points, Vector3[] normals, bool[] hits)
+    private void ShotFxRpc(int index, Vector3[] points, Vector3[] normals, byte[] hits)
     {
         if (switcher == null) switcher = GetComponentInChildren<WeaponSwitcher>(true);
         if (switcher == null) return;
