@@ -2751,7 +2751,7 @@ MonoBehaviour:
   decalOffset: 0.004
   muzzleFlashPrefab: {fileID: 1743301284569550, guid: ad2ab49d0a2a17148bd51c93d977bdbc, type: 3}
   muzzlePoolSize: 8
-  muzzleFlashScale: 0.2
+  muzzleFlashScale: 0.1
   effectLifetime: 2
   volume: 0.7
   hearDistance: 20

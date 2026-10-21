@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Cinemachine;
 
 /// <summary>
 /// 총 발사 (히트스캔) + 탄약 방식 3종 + 절차적 반동.
@@ -20,6 +21,7 @@ using UnityEngine.InputSystem;
 ///  - 섬광: Animator가 처리하는 무기(권총)는 끄고, 없는 무기는 Create Flash Light로 순간 조명 생성
 ///  - 로컬 플레이어(루트가 Player 태그)에서만 입력을 받음
 ///  - FirstPersonController가 꺼져 있으면(카운트다운/사망 Freeze) 발사 불가
+///  - 우클릭 홀드 = 조준(ADS): FOV 축소, 이동 속도 감소(달리기 불가), 탄 퍼짐 감소, 총 위치 이동
 ///
 /// [네트워크 5단계]
 ///  - 피해는 Health.TakeDamage로 보내면 네트워크 플레이어는 호스트가 처리 (산탄은 대상별로 합쳐 한 번만 전송)
@@ -96,6 +98,18 @@ public class GunWeapon : MonoBehaviour
     [Tooltip("총구 위치 (총구 화염이 나오는 곳). 비우면 Flash Local Offset 위치 사용")]
     [SerializeField] private Transform muzzlePoint;
 
+    [Header("조준 (우클릭 홀드)")]
+    [Tooltip("조준 시 시야각. 카메라 기본 FOV(70)보다 작을수록 더 확대")]
+    [SerializeField, Range(20f, 90f)] private float adsFov = 55f;
+    [Tooltip("조준 시 이동 속도 배율 (조준 중에는 달리기 불가)")]
+    [SerializeField, Range(0.1f, 1f)] private float adsMoveMultiplier = 0.5f;
+    [Tooltip("조준 시 탄 퍼짐(Spread Angle) 배율. 1 = 그대로")]
+    [SerializeField, Range(0f, 1f)] private float adsSpreadMultiplier = 0.5f;
+    [Tooltip("조준 시 총 위치 이동 (부모 WeaponHolder 기준, x=좌우 y=위아래 z=앞뒤). 플레이 중 우클릭 누른 채로 조절")]
+    [SerializeField] private Vector3 adsPositionOffset = Vector3.zero;
+    [Tooltip("조준 전환 속도 (클수록 빠름)")]
+    [SerializeField, Min(0.1f)] private float adsSpeed = 12f;
+
     [Header("소리 / 소나")]
     [SerializeField] private AudioClip fireClip;
     [SerializeField] private AudioClip reloadClip;
@@ -148,6 +162,8 @@ public class GunWeapon : MonoBehaviour
     public int MagazineSize => magazineSize;
     public float Energy { get; private set; }
     public bool IsReloading { get; private set; }   // Magazine: 재장전 / Cooldown: 충전 / Battery: 과열
+    /// <summary>우클릭 조준 중인지</summary>
+    public bool IsAiming => aiming;
 
     private Transform owner;              // 플레이어 루트
     private Health ownerHealth;
@@ -171,6 +187,16 @@ public class GunWeapon : MonoBehaviour
     private Light flashLight;
     private float flashOffTime;
 
+    // 조준
+    private bool aiming;
+    private float adsT;                  // 0 = 평소, 1 = 완전히 조준
+    private CinemachineCamera vcam;
+    private float baseFov = -1f;
+    private bool fovTouched;
+    private float baseMoveSpeed, baseSprintSpeed;
+    private bool speedApplied;
+    private StarterAssets.StarterAssetsInputs ownerInput;
+
     private GUIStyle hudStyle;
     private Texture2D dot;
 
@@ -182,6 +208,7 @@ public class GunWeapon : MonoBehaviour
         isLocal = owner.CompareTag("Player");
         ownerHealth = owner.GetComponentInChildren<Health>();
         ownerController = owner.GetComponent<StarterAssets.FirstPersonController>();
+        ownerInput = owner.GetComponent<StarterAssets.StarterAssetsInputs>();
 
         wallRetract = GetComponentInParent<WeaponWallRetract>(true);
 
@@ -264,6 +291,9 @@ public class GunWeapon : MonoBehaviour
         appliedRot = Quaternion.identity;
         recoilPos = recoilRot = 0f;
         if (flashLight != null) flashLight.enabled = false;
+
+        // 조준 해제 (무기 교체 / 사망 등)
+        ReleaseAim();
     }
 
     private void HandleRoundStart(int round) => Refill();
@@ -284,10 +314,14 @@ public class GunWeapon : MonoBehaviour
         if (flashLight != null && flashLight.enabled && Time.time >= flashOffTime)
             flashLight.enabled = false;
 
-        if (!isLocal || !CanAct()) return;
+        if (!isLocal) return;
 
         var mouse = Mouse.current;
         var kb = Keyboard.current;
+
+        bool canAct = CanAct();
+        UpdateAim(canAct && mouse != null && mouse.rightButton.isPressed);
+        if (!canAct) return;
 
         bool firePressed = mouse != null &&
             (automatic ? mouse.leftButton.isPressed : mouse.leftButton.wasPressedThisFrame);
@@ -334,7 +368,7 @@ public class GunWeapon : MonoBehaviour
 
         if (recoilTarget == null) return;
 
-        Vector3 newPos = new Vector3(0f, 0f, -recoilPos);
+        Vector3 newPos = new Vector3(0f, 0f, -recoilPos) + adsPositionOffset * adsT;
         Quaternion newRot = Quaternion.Euler(-recoilRot, 0f, 0f);
 
         recoilTarget.localPosition += newPos - appliedPos;
@@ -343,6 +377,84 @@ public class GunWeapon : MonoBehaviour
 
         appliedPos = newPos;
         appliedRot = newRot;
+    }
+
+    // ───────── 조준 (ADS) ─────────
+
+    private void UpdateAim(bool want)
+    {
+        if (want != aiming)
+        {
+            aiming = want;
+            ApplyMoveSpeed(want);
+        }
+        if (aiming && ownerInput != null) ownerInput.sprint = false;   // 조준 중 달리기 불가
+
+        float target = aiming ? 1f : 0f;
+        adsT = Mathf.Lerp(adsT, target, 1f - Mathf.Exp(-adsSpeed * Time.deltaTime));
+        if (Mathf.Abs(adsT - target) < 0.001f) adsT = target;
+        ApplyFov();
+    }
+
+    private void ApplyMoveSpeed(bool aim)
+    {
+        var fpc = ownerController as StarterAssets.FirstPersonController;
+        if (fpc == null) return;
+        if (aim && !speedApplied)
+        {
+            baseMoveSpeed = fpc.MoveSpeed;
+            baseSprintSpeed = fpc.SprintSpeed;
+            fpc.MoveSpeed = baseMoveSpeed * adsMoveMultiplier;
+            fpc.SprintSpeed = fpc.MoveSpeed;
+            speedApplied = true;
+        }
+        else if (!aim && speedApplied)
+        {
+            fpc.MoveSpeed = baseMoveSpeed;
+            fpc.SprintSpeed = baseSprintSpeed;
+            speedApplied = false;
+        }
+    }
+
+    private void ApplyFov()
+    {
+        if (vcam == null)
+        {
+            if (adsT <= 0f) return;
+            vcam = FindAnyObjectByType<CinemachineCamera>();
+            if (vcam == null) return;
+        }
+
+        if (adsT <= 0f)
+        {
+            if (fovTouched) SetFov(baseFov);   // 원래 값으로 한 번 되돌림
+            fovTouched = false;
+            return;
+        }
+
+        if (!fovTouched)
+        {
+            baseFov = vcam.Lens.FieldOfView;   // 조준 시작 순간의 기본 FOV
+            fovTouched = true;
+        }
+        SetFov(Mathf.Lerp(baseFov, adsFov, adsT));
+    }
+
+    private void SetFov(float fov)
+    {
+        if (vcam == null) return;
+        var lens = vcam.Lens;
+        lens.FieldOfView = fov;
+        vcam.Lens = lens;
+    }
+
+    private void ReleaseAim()
+    {
+        aiming = false;
+        ApplyMoveSpeed(false);
+        adsT = 0f;
+        if (fovTouched) SetFov(baseFov);
+        fovTouched = false;
     }
 
     private bool CanAct()
@@ -400,7 +512,7 @@ public class GunWeapon : MonoBehaviour
         if (ImpactEffects.Instance != null)
         {
             Transform aim = aimCamera != null ? aimCamera.transform : transform;
-            ImpactEffects.Instance.PlayMuzzleFlash(MuzzlePosition, aim.forward);
+            ImpactEffects.Instance.PlayMuzzleFlash(MuzzlePosition, aim.forward, muzzlePoint != null ? muzzlePoint : transform);   // 총구를 따라감
         }
 
         // 히트스캔 (산탄이면 여러 발). 피해는 대상별로 합쳐서 한 번만 보냄 (네트워크 메시지 절약)
@@ -462,10 +574,11 @@ public class GunWeapon : MonoBehaviour
         Vector3 origin = cam.position;
         Vector3 dir = cam.forward;
 
-        if (spreadAngle > 0f)
+        float spread = aiming ? spreadAngle * adsSpreadMultiplier : spreadAngle;
+        if (spread > 0f)
         {
             // 원뿔 안에서 랜덤 방향
-            Vector2 r = UnityEngine.Random.insideUnitCircle * Mathf.Tan(spreadAngle * Mathf.Deg2Rad);
+            Vector2 r = UnityEngine.Random.insideUnitCircle * Mathf.Tan(spread * Mathf.Deg2Rad);
             dir = (cam.forward + cam.right * r.x + cam.up * r.y).normalized;
         }
 
@@ -513,9 +626,9 @@ public class GunWeapon : MonoBehaviour
         // 총구 화염: 다른 사람 화면에서는 3인칭 총구 (관전 중이면 1인칭 총구)
         if (ImpactEffects.Instance != null)
         {
-            Vector3 from = RemoteMuzzlePosition();
+            Transform follow = RemoteMuzzle(out Vector3 from);
             Vector3 to = points != null && points.Length > 0 ? points[0] : from + owner.forward;
-            ImpactEffects.Instance.PlayMuzzleFlash(from, to - from);
+            ImpactEffects.Instance.PlayMuzzleFlash(from, to - from, follow);
         }
 
         if (fireClip != null && audioSource != null && audioSource.isActiveAndEnabled)
@@ -537,14 +650,18 @@ public class GunWeapon : MonoBehaviour
     /// <summary>총구 위치 (Muzzle Point가 없으면 Flash Local Offset)</summary>
     public Vector3 MuzzlePosition => muzzlePoint != null ? muzzlePoint.position : transform.TransformPoint(flashLocalOffset);
 
-    /// <summary>다른 사람이 쏜 총의 총구: 3인칭 총의 MuzzlePoint (관전 중이면 1인칭 총구)</summary>
-    private Vector3 RemoteMuzzlePosition()
+    /// <summary>다른 사람이 쏜 총의 총구: 3인칭 총의 MuzzlePoint (관전 중이면 1인칭 총구). 화염이 따라갈 Transform 반환</summary>
+    private Transform RemoteMuzzle(out Vector3 position)
     {
         var net = owner != null ? owner.GetComponent<PlayerNetworkSetup>() : null;
-        if (net != null && net.IsSpectated) return MuzzlePosition;
-        var tpw = owner != null ? owner.GetComponentInChildren<ThirdPersonWeapon>() : null;
-        var m = tpw != null ? tpw.CurrentMuzzle : null;
-        return m != null ? m.position : MuzzlePosition;
+        if (net == null || !net.IsSpectated)
+        {
+            var tpw = owner != null ? owner.GetComponentInChildren<ThirdPersonWeapon>() : null;
+            var m = tpw != null ? tpw.CurrentMuzzle : null;
+            if (m != null) { position = m.position; return m; }
+        }
+        position = MuzzlePosition;
+        return muzzlePoint != null ? muzzlePoint : transform;
     }
 
     /// <param name="surface">0 = 안 맞음, 1 + SurfaceKind</param>

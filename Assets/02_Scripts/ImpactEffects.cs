@@ -93,13 +93,7 @@ public class ImpactEffects : MonoBehaviour
         if (muzzleFlashPrefab != null)
         {
             muzzlePool = new GameObject[muzzlePoolSize];
-            for (int i = 0; i < muzzlePoolSize; i++)
-            {
-                var go = Instantiate(muzzleFlashPrefab, poolRoot);
-                go.transform.localScale *= muzzleFlashScale;
-                PrepareEffect(go);
-                muzzlePool[i] = go;
-            }
+            for (int i = 0; i < muzzlePoolSize; i++) muzzlePool[i] = CreateMuzzle();
         }
 
         BuildDecals();
@@ -130,7 +124,9 @@ public class ImpactEffects : MonoBehaviour
         foreach (var go in expired)
         {
             activeUntil.Remove(go);
-            if (go != null) go.SetActive(false);
+            if (go == null) continue;
+            go.SetActive(false);
+            if (go.transform.parent != poolRoot) go.transform.SetParent(poolRoot, true);   // 총구를 따라가던 화염 회수
         }
     }
 
@@ -246,14 +242,35 @@ public class ImpactEffects : MonoBehaviour
         PlaySound(s.clips, point);
     }
 
-    /// <summary>총구 화염 (총구 위치, 쏘는 방향)</summary>
-    public void PlayMuzzleFlash(Vector3 position, Vector3 direction)
+    /// <summary>총구 화염 (총구 위치, 쏘는 방향, 따라갈 총구 Transform - 비우면 제자리)</summary>
+    public void PlayMuzzleFlash(Vector3 position, Vector3 direction, Transform follow = null)
     {
         if (muzzlePool == null || muzzlePool.Length == 0) return;
         if (direction.sqrMagnitude < 0.0001f) direction = Vector3.forward;
-        var go = muzzlePool[muzzleNext];
+        int idx = muzzleNext;
         muzzleNext = (muzzleNext + 1) % muzzlePool.Length;
+
+        var go = muzzlePool[idx];
+        if (go == null) { go = CreateMuzzle(); muzzlePool[idx] = go; }   // 따라가던 총과 함께 삭제된 경우 다시 만듦
+
+        // 움직이는 총구를 따라가도록 붙임 (파티클은 Local 공간이라 같이 움직임)
+        go.SetActive(false);
+        go.transform.SetParent(follow != null ? follow : poolRoot, true);
+        foreach (var r in go.GetComponentsInChildren<Renderer>(true)) r.forceRenderingOff = false;   // 무기 숨김 처리에 같이 꺼졌을 수 있음
         Play(go, position, Quaternion.LookRotation(direction.normalized));
+    }
+
+    private GameObject CreateMuzzle()
+    {
+        var go = Instantiate(muzzleFlashPrefab, poolRoot);
+        go.transform.localScale *= muzzleFlashScale;
+        foreach (var ps in go.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            var main = ps.main;
+            main.simulationSpace = ParticleSystemSimulationSpace.Local;   // 총구와 함께 움직이게
+        }
+        PrepareEffect(go);
+        return go;
     }
 
     /// <summary>탄흔 전부 지움 (라운드 시작 때 자동)</summary>
