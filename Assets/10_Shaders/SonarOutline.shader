@@ -2,6 +2,7 @@
 // SonarDepthFeature가 그린 "캐릭터 없는" 깊이/노멀로 외곽선을 찾는다 → 캐릭터 자리에도 뒤 배경 선이 이어짐.
 // 소리 범위(SoundPulseManager) 안에서만 표시. 바닥(위를 향한 면)은 월드 격자로 표시.
 // 깊이 외곽선은 "꺾임(2차 차이)"으로 판정 → 비스듬히 본 평평한 벽이 통째로 빛나지 않음.
+// 이미 빛을 받아 밝은 픽셀(형광등 아래, 네온, 번개 섬광 등)은 외곽선을 빼서, 빛 받은 곳은 그대로 보이고 어두운 곳만 소나로 보임.
 Shader "BlindSpot/SonarOutline"
 {
     Properties
@@ -29,6 +30,10 @@ Shader "BlindSpot/SonarOutline"
         _InnerFade ("Fade Toward Edge", Range(0, 1)) = 0.6
         _RingWidth ("Leading Ring Width (m)", Range(0.05, 3)) = 0.6
         _RingBoost ("Leading Ring Boost", Range(0, 3)) = 0.6
+
+        [Header(Lit Area)]
+        _LitThreshold ("Lit Threshold (이 밝기부터 외곽선 줄어듦)", Range(0, 2)) = 0.15
+        _LitFade ("Lit Fade (이만큼 더 밝으면 외곽선 완전히 사라짐)", Range(0.01, 1)) = 0.1
 
         [Header(Debug)]
         [IntRange] _DebugView ("Debug View (0 끔, 1 외곽선 전체, 2 소리 범위, 3 소나 깊이)", Range(0, 3)) = 0
@@ -67,6 +72,7 @@ Shader "BlindSpot/SonarOutline"
             float _Thickness, _DepthSensitivity, _DepthThreshold, _NormalSensitivity, _NormalThreshold;
             float _FloorGrid, _FloorNormalY, _GridSize, _GridWidth, _GridIntensity;
             float _EdgeSoftness, _InnerFade, _RingWidth, _RingBoost;
+            float _LitThreshold, _LitFade;
             float _DebugView;
 
             float RawDepth(float2 uv)
@@ -182,6 +188,11 @@ Shader "BlindSpot/SonarOutline"
                 // [디버그 2] 소리 범위를 초록색으로 표시
                 if (dbg == 2) return half4(scene.rgb + half3(0, mask * 0.5, 0), 1);
 
+                if (mask <= 0.001) return scene;
+
+                // 이미 밝은 곳은 외곽선 빼기 (화면 밝기 기준)
+                float lum = dot(scene.rgb, float3(0.2126, 0.7152, 0.0722));
+                mask *= 1 - smoothstep(_LitThreshold, _LitThreshold + _LitFade, lum);
                 if (mask <= 0.001) return scene;
 
                 float edge = EdgeAt(uv, floorMask);

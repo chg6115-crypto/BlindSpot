@@ -38,6 +38,8 @@ Material:
     - _GridWidth: 1.2
     - _InnerFade: 0.6
     - _Intensity: 0.4
+    - _LitFade: 0.1
+    - _LitThreshold: 0.15
     - _NormalSensitivity: 1
     - _NormalThreshold: 0.8
     - _RingBoost: 0.6
