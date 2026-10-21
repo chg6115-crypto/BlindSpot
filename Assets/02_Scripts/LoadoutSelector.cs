@@ -7,7 +7,6 @@ using UnityEngine;
 ///    참가자는 호스트가 보낸 값을 사용 (RoundNetworkSync.RoundWeaponRpc). 싱글은 혼자 정함
 ///  - 내 플레이어: 그 총만 허용하고 손에 쥐어줌 (라운드 동안 전환 불가)
 ///  - 마네킹·봇: ThirdPersonWeapon이 RoundWeaponChanged를 받아 같은 총을 듦 (총으로 구분 안 되게)
-///  - 카운트다운 동안 화면에 "WEAPON: 이름" 표시
 /// Weapon Names 순서 = WeaponHolder 자식(GunWeapon) 순서. 이름은 GunWeapon.WeaponName / 3인칭 WeaponSocket 자식 이름과 같게.
 /// </summary>
 public class LoadoutSelector : MonoBehaviour
@@ -19,12 +18,6 @@ public class LoadoutSelector : MonoBehaviour
     [Tooltip("RoundManager가 없을 때(테스트 씬)도 랜덤 1개로 제한할지")]
     [SerializeField] private bool lockWithoutRoundManager = false;
 
-    [Header("UI (카운트다운 중 무기 이름)")]
-    [SerializeField] private bool showUI = true;
-    [SerializeField] private int fontSize = 26;
-    [SerializeField, Range(0f, 1f)] private float panelY = 0.72f;
-    [SerializeField] private Color textColor = new Color(0.3f, 1f, 0.9f, 1f);
-
     /// <summary>이번 라운드 무기 번호 (-1 = 아직 없음)</summary>
     public static int RoundWeaponIndex { get; private set; } = -1;
     /// <summary>이번 라운드 무기 이름 (null = 아직 없음)</summary>
@@ -35,7 +28,6 @@ public class LoadoutSelector : MonoBehaviour
     public static LoadoutSelector Instance { get; private set; }
 
     private RoundManager round;
-    private GUIStyle style;
     private bool applied;   // 현재 무기를 내 손에 적용했는지
 
     private void Awake()
@@ -144,23 +136,5 @@ public class LoadoutSelector : MonoBehaviour
             if (w != null && string.Equals(w.WeaponName, name, StringComparison.OrdinalIgnoreCase)) return i;
         }
         return -1;
-    }
-
-    // ───────── UI ─────────
-
-    private void OnGUI()
-    {
-        if (!showUI || string.IsNullOrEmpty(RoundWeaponName)) return;
-        if (round == null || round.CurrentState != RoundManager.State.Intro) return;
-
-        if (style == null)
-            style = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-        style.fontSize = fontSize;
-
-        var old = GUI.color;
-        GUI.color = textColor;
-        float h = fontSize * 2f;
-        GUI.Label(new Rect(0, Screen.height * panelY, Screen.width, h), $"WEAPON: {RoundWeaponName.ToUpperInvariant()}", style);
-        GUI.color = old;
     }
 }

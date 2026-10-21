@@ -83,6 +83,10 @@ public class RoundManager : MonoBehaviour
     [Header("임시 HUD")]
     [SerializeField] private bool showHud = true;
     [SerializeField] private int hudFontSize = 20;
+    [Tooltip("가운데 카운트다운 / 결과 글자 크기")]
+    [SerializeField] private int bannerFontSize = 28;
+    [Tooltip("HUD 글꼴 (ttf). 비우면 기본 글꼴")]
+    [SerializeField] private Font hudFont;
 
     /// <summary>라운드 시작 - 인트로 시작 시점 (라운드 번호)</summary>
     public event Action<int> OnRoundStart;
@@ -656,13 +660,14 @@ public class RoundManager : MonoBehaviour
             hudStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize = hudFontSize,
+                font = hudFont,
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
                 normal = { textColor = new Color(0.85f, 0.9f, 1f) }
             };
             bannerStyle = new GUIStyle(hudStyle)
             {
-                fontSize = hudFontSize * 3,
+                fontSize = bannerFontSize,
                 normal = { textColor = Color.white }
             };
         }

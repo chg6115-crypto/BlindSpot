@@ -11901,6 +11901,8 @@ MonoBehaviour:
   trapSpawner: {fileID: 0}
   showHud: 1
   hudFontSize: 20
+  bannerFontSize: 28
+  hudFont: {fileID: 12800000, guid: e7990e902736bea4095d734b1f382135, type: 3}
 --- !u!114 &1862935633
 MonoBehaviour:
   m_ObjectHideFlags: 0

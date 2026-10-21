@@ -94,7 +94,7 @@ MonoBehaviour:
   modelShadowsOff: 1
   setModelLayer: 1
   modelLayer: 0
-  showHud: 1
+  showHud: 0
   showCrosshair: 1
   debugDrawRay: 1
 --- !u!1 &852114064464701536
@@ -191,7 +191,7 @@ MonoBehaviour:
   modelShadowsOff: 1
   setModelLayer: 1
   modelLayer: 0
-  showHud: 1
+  showHud: 0
   showCrosshair: 1
   debugDrawRay: 1
 --- !u!1 &1806229315747381764
@@ -391,6 +391,7 @@ GameObject:
   - component: {fileID: 8226557720713721199}
   - component: {fileID: 8583273075793238257}
   - component: {fileID: 665788640219431648}
+  - component: {fileID: 573210153659438455}
   m_Layer: 6
   m_Name: Player_FPS
   m_TagString: Player
@@ -625,7 +626,7 @@ MonoBehaviour:
   mannequinFallsOnHit: 1
   fallDuration: 0.35
   hideDelay: 1.5
-  showHud: 1
+  showHud: 0
 --- !u!54 &2483345247297401706
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -675,7 +676,7 @@ MonoBehaviour:
   holdTime: 2
   fadeTime: 2
   localPlayerTag: Player
-  showHud: 1
+  showHud: 0
   hudFontSize: 18
 --- !u!114 &7640081968219878299
 MonoBehaviour:
@@ -1210,3 +1211,28 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3977358996716560008, guid: 02f21013416c60041b7f9fdd410b2d7a, type: 3}
   m_PrefabInstance: {fileID: 6832246638503890089}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &573210153659438455
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8224617769351544002}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed267e8bdc4c4880a79df752a4028e81, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerHUD
+  themeColor: {r: 0.3, g: 1, b: 0.9, a: 1}
+  dimColor: {r: 0.3, g: 1, b: 0.9, a: 0.2}
+  hitColor: {r: 1, g: 0.25, b: 0.2, a: 1}
+  font: {fileID: 11400000, guid: ad6f7f1cb6b9d4a45845f0c162c53657, type: 2}
+  margin: {x: 40, y: 36}
+  hpFrameSprite: {fileID: 21300000, guid: e47cd1f09118423d83da2798c6b2b446, type: 3}
+  hpWidth: 300
+  hpFillArea: {x: 0.21, y: 0.3, z: 0.925, w: 0.68}
+  hpLabelSize: 18
+  sonarSprite: {fileID: 21300000, guid: 881264a2ee2049a08f91ab4a8e69a1c3, type: 3}
+  sonarSize: 76
+  keyLabelSize: 16
+  ammoFontSize: 40
