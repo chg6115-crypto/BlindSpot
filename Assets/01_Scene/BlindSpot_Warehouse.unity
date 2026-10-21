@@ -8352,6 +8352,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AntiCampTrap
   radius: 1
   dwellTime: 3
+  maxAngle: 55
   blockMask:
     serializedVersion: 2
     m_Bits: 951
@@ -11751,6 +11752,26 @@ PrefabInstance:
     - target: {fileID: 5444574972025284398, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
       propertyPath: m_ConstrainProportionsScale
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 7302012524098924381, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.92387956
+      objectReference: {fileID: 0}
+    - target: {fileID: 7302012524098924381, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7302012524098924381, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.38268343
+      objectReference: {fileID: 0}
+    - target: {fileID: 7302012524098924381, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7302012524098924381, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 45
       objectReference: {fileID: 0}
     - target: {fileID: 7753622622193103077, guid: c2bac2de5113a4749aa7217588cc6206, type: 3}
       propertyPath: m_Name

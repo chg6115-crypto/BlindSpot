@@ -21,7 +21,8 @@ using Unity.Cinemachine;
 ///  - 섬광: Animator가 처리하는 무기(권총)는 끄고, 없는 무기는 Create Flash Light로 순간 조명 생성
 ///  - 로컬 플레이어(루트가 Player 태그)에서만 입력을 받음
 ///  - FirstPersonController가 꺼져 있으면(카운트다운/사망 Freeze) 발사 불가
-///  - 우클릭 홀드 = 조준(ADS): FOV 축소, 이동 속도 감소(달리기 불가), 탄 퍼짐 감소, 총 위치 이동
+///  - 우클릭 홀드 = 조준(ADS): 총을 화면 가운데로 일자로 들어 올림(조준점 자동 정렬), 화면 중앙 조준점 표시(평소엔 없음),
+///    이동 속도 감소(달리기 불가), 탄 퍼짐 감소. 확대(FOV)는 Ads Zoom을 켰을 때만
 ///
 /// [네트워크 5단계]
 ///  - 피해는 Health.TakeDamage로 보내면 네트워크 플레이어는 호스트가 처리 (산탄은 대상별로 합쳐 한 번만 전송)
@@ -99,13 +100,21 @@ public class GunWeapon : MonoBehaviour
     [SerializeField] private Transform muzzlePoint;
 
     [Header("조준 (우클릭 홀드)")]
-    [Tooltip("조준 시 시야각. 카메라 기본 FOV(70)보다 작을수록 더 확대")]
+    [Tooltip("조준점 (총 윗면 뒤쪽, 눈을 대는 곳). 비우면 총 모델 크기로 자동 계산 (윗면 뒤쪽 가운데)")]
+    [SerializeField] private Transform aimPoint;
+    [Tooltip("조준 시 조준점이 화면 중앙보다 이만큼 아래 (m). 0이면 정중앙")]
+    [SerializeField] private float adsSightDrop = 0.02f;
+    [Tooltip("조준 시 카메라에서 조준점까지 거리 (m). 0이면 평소 거리 유지")]
+    [SerializeField, Min(0f)] private float adsSightDistance = 0f;
+    [Tooltip("조준 시 확대 (끄면 FOV 그대로)")]
+    [SerializeField] private bool adsZoom = false;
+    [Tooltip("확대할 때 시야각. 카메라 기본 FOV(70)보다 작을수록 더 확대")]
     [SerializeField, Range(20f, 90f)] private float adsFov = 55f;
     [Tooltip("조준 시 이동 속도 배율 (조준 중에는 달리기 불가)")]
     [SerializeField, Range(0.1f, 1f)] private float adsMoveMultiplier = 0.5f;
     [Tooltip("조준 시 탄 퍼짐(Spread Angle) 배율. 1 = 그대로")]
     [SerializeField, Range(0f, 1f)] private float adsSpreadMultiplier = 0.5f;
-    [Tooltip("조준 시 총 위치 이동 (부모 WeaponHolder 기준, x=좌우 y=위아래 z=앞뒤). 플레이 중 우클릭 누른 채로 조절")]
+    [Tooltip("자동 정렬 후 추가 미세 조정 (부모 WeaponHolder 기준, x=좌우 y=위아래 z=앞뒤). 플레이 중 우클릭 누른 채로 조절")]
     [SerializeField] private Vector3 adsPositionOffset = Vector3.zero;
     [Tooltip("조준 전환 속도 (클수록 빠름)")]
     [SerializeField, Min(0.1f)] private float adsSpeed = 12f;
@@ -196,6 +205,8 @@ public class GunWeapon : MonoBehaviour
     private float baseMoveSpeed, baseSprintSpeed;
     private bool speedApplied;
     private StarterAssets.StarterAssetsInputs ownerInput;
+    private Vector3 adsAlignPos;                         // 자동 정렬: 기본 자세 대비 위치 (부모 기준)
+    private Quaternion adsAlignRot = Quaternion.identity; // 자동 정렬: 기본 자세 대비 회전 (부모 기준)
 
     private GUIStyle hudStyle;
     private Texture2D dot;
@@ -368,8 +379,8 @@ public class GunWeapon : MonoBehaviour
 
         if (recoilTarget == null) return;
 
-        Vector3 newPos = new Vector3(0f, 0f, -recoilPos) + adsPositionOffset * adsT;
-        Quaternion newRot = Quaternion.Euler(-recoilRot, 0f, 0f);
+        Vector3 newPos = new Vector3(0f, 0f, -recoilPos) + (adsAlignPos + adsPositionOffset) * adsT;
+        Quaternion newRot = Quaternion.Euler(-recoilRot, 0f, 0f) * Quaternion.Slerp(Quaternion.identity, adsAlignRot, adsT);
 
         recoilTarget.localPosition += newPos - appliedPos;
         // 부모(카메라) 기준으로 회전 → 무기 모델 방향과 상관없이 항상 총구가 위로 들림
@@ -385,6 +396,7 @@ public class GunWeapon : MonoBehaviour
     {
         if (want != aiming)
         {
+            if (want && adsT < 0.05f) ComputeAdsAlign();   // 조준 시작: 총 정렬 위치 계산
             aiming = want;
             ApplyMoveSpeed(want);
         }
@@ -416,8 +428,80 @@ public class GunWeapon : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 조준했을 때 총의 위치·회전 계산: 총 몸통 축(뒤 가운데 → 총구)을 카메라 정면과 일직선으로,
+    /// 조준점(윗면 뒤쪽)을 화면 중앙 바로 아래로
+    /// </summary>
+    private void ComputeAdsAlign()
+    {
+        adsAlignPos = Vector3.zero;
+        adsAlignRot = Quaternion.identity;
+        Transform cam = aimCamera != null ? aimCamera.transform : null;
+        Transform gun = recoilTarget;
+        Transform parent = gun != null ? gun.parent : null;
+        if (cam == null || gun == null || parent == null) return;
+
+        // 총 모델 범위 (카메라 기준) → 윗면 뒤쪽 가운데 / 뒤 가운데 / 앞 가운데
+        bool any = false;
+        Vector3 min = Vector3.positiveInfinity, max = Vector3.negativeInfinity;
+        foreach (var r in GetComponentsInChildren<Renderer>(true))
+        {
+            if (!(r is MeshRenderer || r is SkinnedMeshRenderer)) continue;
+            Bounds b = r.localBounds;
+            Transform space = r is SkinnedMeshRenderer sk && sk.rootBone != null ? sk.rootBone : r.transform;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 c = b.center + Vector3.Scale(b.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 pc = cam.InverseTransformPoint(space.TransformPoint(c));
+                min = Vector3.Min(min, pc);
+                max = Vector3.Max(max, pc);
+                any = true;
+            }
+        }
+        if (!any) return;
+        Vector3 center = (min + max) * 0.5f;
+
+        Vector3 sightW = aimPoint != null ? aimPoint.position : cam.TransformPoint(new Vector3(center.x, max.y, min.z));
+        Vector3 rearW = cam.TransformPoint(new Vector3(center.x, center.y, min.z));
+        Vector3 frontW = muzzlePoint != null ? muzzlePoint.position : cam.TransformPoint(new Vector3(center.x, center.y, max.z));
+
+        // 총 기준 로컬 (자세와 무관)
+        Vector3 sightL = gun.InverseTransformPoint(sightW);
+        Vector3 rearL = gun.InverseTransformPoint(rearW);
+        Vector3 frontL = gun.InverseTransformPoint(frontW);
+
+        // 기본 자세 (반동·조준 오프셋을 뺀 상태)
+        Vector3 baseLocalPos = gun.localPosition - appliedPos;
+        Quaternion baseLocalRot = Quaternion.Inverse(appliedRot) * gun.localRotation;
+        Vector3 p0 = parent.TransformPoint(baseLocalPos);
+        Quaternion r0 = parent.rotation * baseLocalRot;
+        Vector3 s = gun.lossyScale;
+        Vector3 W(Vector3 l) => p0 + r0 * Vector3.Scale(l, s);
+
+        // 1) 회전: 몸통 축을 카메라 정면으로
+        Vector3 axis = W(frontL) - W(rearL);
+        if (axis.sqrMagnitude < 1e-6f) return;
+        Quaternion turn = Quaternion.FromToRotation(axis.normalized, cam.forward);
+        Quaternion r1 = turn * r0;
+        Vector3 s1 = p0 + turn * (W(sightL) - p0);
+
+        // 2) 위치: 조준점을 화면 중앙 바로 아래로
+        float depth = adsSightDistance > 0f ? adsSightDistance : Vector3.Dot(s1 - cam.position, cam.forward);
+        Vector3 target = cam.position + cam.forward * depth - cam.up * adsSightDrop;
+        Vector3 p1 = p0 + (target - s1);
+
+        adsAlignPos = parent.InverseTransformPoint(p1) - baseLocalPos;
+        adsAlignRot = (Quaternion.Inverse(parent.rotation) * r1) * Quaternion.Inverse(baseLocalRot);
+    }
+
     private void ApplyFov()
     {
+        if (!adsZoom)
+        {
+            if (fovTouched) SetFov(baseFov);   // 확대 끔: 혹시 바뀐 FOV는 원래대로
+            fovTouched = false;
+            return;
+        }
         if (vcam == null)
         {
             if (adsT <= 0f) return;
@@ -718,7 +802,7 @@ public class GunWeapon : MonoBehaviour
     {
         if (!isLocal) return;
 
-        if (showCrosshair)
+        if (showCrosshair && adsT > 0.5f)   // 조준점은 우클릭 조준 중에만 표시 (평소엔 없음)
         {
             if (dot == null)
             {
