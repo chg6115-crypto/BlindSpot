@@ -161,6 +161,7 @@ GameObject:
   - component: {fileID: 5716713825910619012}
   - component: {fileID: 2023776047642724591}
   - component: {fileID: 3009358610321380945}
+  - component: {fileID: 6184053291742205517}
   m_Layer: 0
   m_Name: Factory1Wall01Glass
   m_TagString: Untagged
@@ -262,3 +263,15 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: 30
   m_Mesh: {fileID: 4300002, guid: ef9217f32fa650b459b64b3ec7b090a4, type: 3}
+--- !u!114 &6184053291742205517
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7234756616860828781}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e05c121d48a04b768f5738a07025ae21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LightPassThrough

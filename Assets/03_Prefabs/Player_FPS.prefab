@@ -875,12 +875,12 @@ MonoBehaviour:
   runStride: 2.6
   runSpeedThreshold: 5
   minMoveSpeed: 0.5
-  walkVolume: 0.35
+  walkVolume: 0.2
   runVolume: 0.85
   localVolumeScale: 0.6
   landVolume: 0.7
   pitchRange: {x: 0.92, y: 1.08}
-  walkHearDistance: 10
+  walkHearDistance: 20
   runHearDistance: 20
   groundMask:
     serializedVersion: 2
