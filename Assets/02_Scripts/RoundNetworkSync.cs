@@ -17,6 +17,7 @@ using UnityEngine;
 ///   날씨        : 라운드마다 호스트가 정한 날씨 (WeatherManager)
 ///   번개        : 종류·위치·연출 시드 (LightningStorm)
 ///   라운드 무기 : 모두가 같은 총 (LoadoutSelector)
+///   anti-camp   : 발동한 전등 번호 + 지점 + 대상 + 시작 반경 (AntiCampTrap)
 /// </summary>
 [DisallowMultipleComponent]
 public class RoundNetworkSync : NetworkBehaviour
@@ -122,7 +123,19 @@ public class RoundNetworkSync : NetworkBehaviour
         if (IsSpawned && IsServer) RoundWeaponRpc(index);
     }
 
+    /// <summary>호스트: anti-camp 전등 발동을 참가자에게 (AntiCampTrap이 호출)</summary>
+    public void SendAntiCamp(int lampIndex, Vector3 spot, ulong targetNetId, float startRadius)
+    {
+        if (IsSpawned && IsServer) AntiCampRpc(lampIndex, spot, targetNetId, startRadius);
+    }
+
     // ───────── 참가자에서 실행 ─────────
+
+    [Rpc(SendTo.NotServer)]
+    private void AntiCampRpc(int lampIndex, Vector3 spot, ulong targetNetId, float startRadius)
+    {
+        if (AntiCampTrap.Instance != null) AntiCampTrap.Instance.PlayLampFromHost(lampIndex, spot, targetNetId, startRadius);
+    }
 
     [Rpc(SendTo.NotServer)]
     private void RoundWeaponRpc(int index)
