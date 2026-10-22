@@ -178,22 +178,24 @@ public class ImpactEffects : MonoBehaviour
     {
         decals = new Transform[maxDecals];
         decalRenderers = new MeshRenderer[maxDecals];
+        for (int i = 0; i < maxDecals; i++) CreateDecal(i);
+    }
+
+    private void CreateDecal(int i)
+    {
         int layer = LayerMask.NameToLayer("NoSonar");   // 소나 외곽선에 탄흔 테두리가 생기지 않게
         if (layer < 0) layer = 0;
-        for (int i = 0; i < maxDecals; i++)
-        {
-            var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            q.name = "BulletHole";
-            Destroy(q.GetComponent<Collider>());
-            q.layer = layer;
-            q.transform.SetParent(poolRoot, false);
-            var mr = q.GetComponent<MeshRenderer>();
-            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            mr.receiveShadows = true;
-            q.SetActive(false);
-            decals[i] = q.transform;
-            decalRenderers[i] = mr;
-        }
+        var q = GameObject.CreatePrimitive(PrimitiveType.Quad);
+        q.name = "BulletHole";
+        Destroy(q.GetComponent<Collider>());
+        q.layer = layer;
+        q.transform.SetParent(poolRoot, false);
+        var mr = q.GetComponent<MeshRenderer>();
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows = true;
+        q.SetActive(false);
+        decals[i] = q.transform;
+        decalRenderers[i] = mr;
     }
 
     private void BuildAudio()
@@ -273,12 +275,30 @@ public class ImpactEffects : MonoBehaviour
         return go;
     }
 
+   
     /// <summary>탄흔 전부 지움 (라운드 시작 때 자동)</summary>
     public void ClearDecals()
     {
         if (decals == null) return;
-        foreach (var d in decals) if (d != null) d.gameObject.SetActive(false);
+        foreach (var d in decals)
+        {
+            if (d == null) continue;
+            d.gameObject.SetActive(false);
+            d.SetParent(poolRoot, false);   // 물체에 붙어 있던 탄흔 회수
+        }
         decalNext = 0;
+    }
+
+    /// <summary>root 아래에 붙은 탄흔만 지움 (소품이 깨지거나 복구될 때)</summary>
+    public void ClearDecalsOn(Transform root)
+    {
+        if (decals == null || root == null) return;
+        foreach (var d in decals)
+        {
+            if (d == null || !d.IsChildOf(root)) continue;
+            d.gameObject.SetActive(false);
+            d.SetParent(poolRoot, false);
+        }
     }
 
     // ───────── 내부 ─────────
@@ -303,14 +323,32 @@ public class ImpactEffects : MonoBehaviour
         int i = decalNext;
         decalNext = (decalNext + 1) % decals.Length;   // 다 차면 가장 오래된 것부터 재사용
 
+        if (decals[i] == null) CreateDecal(i);          // 붙어 있던 물체와 함께 삭제된 경우 다시 만듦
         var t = decals[i];
+        t.SetParent(poolRoot, false);
+
         float size = Random.Range(s.decalSize.x, s.decalSize.y);
         // Quad는 -Z 쪽이 앞면 → -Z가 면 바깥(normal)을 보도록
         t.SetPositionAndRotation(point + normal * decalOffset,
                                  Quaternion.LookRotation(-normal) * Quaternion.Euler(0f, 0f, Random.Range(0f, 360f)));
         t.localScale = new Vector3(size, size, 1f);
+
+        // 움직이는 물체(Rigidbody / 깨지는 소품)에 맞았으면 따라가도록 자식으로 붙임
+        Transform follow = FindMovingTarget(point, normal);
+        if (follow != null) t.SetParent(follow, true);
+
         decalRenderers[i].sharedMaterial = s.decalMaterial;
         t.gameObject.SetActive(true);
+    }
+
+    /// <summary>맞은 지점의 콜라이더가 움직일 수 있는 물체면 그 Transform</summary>
+    private static Transform FindMovingTarget(Vector3 point, Vector3 normal)
+    {
+        if (!Physics.Raycast(point + normal * 0.05f, -normal, out RaycastHit hit, 0.1f, ~0, QueryTriggerInteraction.Ignore))
+            return null;
+        var col = hit.collider;
+        if (col.attachedRigidbody != null || col.GetComponentInParent<BreakableProp>() != null) return col.transform;
+        return null;
     }
 
     private void PlaySound(AudioClip[] clips, Vector3 point)
