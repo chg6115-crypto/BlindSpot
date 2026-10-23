@@ -710,6 +710,75 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4274811861815102194, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
   m_PrefabInstance: {fileID: 4905429113475885432}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &848403858
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalScale.z
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 1.56382
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 3.69
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: -90
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 7215989879056496772, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8029786455012909630, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
+      propertyPath: m_Name
+      value: Obelisk
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: be0512029b4ecd04a8d755a7709b1378, type: 3}
 --- !u!1 &1107538019
 GameObject:
   m_ObjectHideFlags: 0
@@ -1019,6 +1088,70 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.ctime2
+      value: 49151
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.ctime3
+      value: 65535
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.ctime4
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key1.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key1.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key1.r
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key2.b
+      value: 0.75
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key2.g
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key2.r
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key3.b
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key3.g
+      value: 0.15
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key4.b
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key4.g
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.key4.r
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.m_ColorSpace
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3356776273961942959, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
+      propertyPath: speedColors.m_NumColorKeys
+      value: 4
+      objectReference: {fileID: 0}
     - target: {fileID: 3465799265780879432, guid: d17e512a49349c349a320e5144cb4e11, type: 3}
       propertyPath: m_Name
       value: Motorcycle
@@ -1080,3 +1213,4 @@ SceneRoots:
   - {fileID: 115711326}
   - {fileID: 4905429113475885432}
   - {fileID: 1107538021}
+  - {fileID: 848403858}
