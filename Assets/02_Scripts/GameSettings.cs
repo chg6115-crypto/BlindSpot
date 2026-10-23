@@ -9,6 +9,8 @@ using UnityEngine.Audio;
 ///  - Music / SFX : Resources/MainMixer 의 노출 파라미터 "MusicVolume", "SFXVolume"
 ///    (믹서가 없으면 Music/SFX 슬라이더는 효과 없음)
 ///  - 마우스 감도 : MouseSensitivityApplier 가 SensitivityMultiplier 를 읽어 적용 (50 = 기본 감도)
+///    내부 값은 5~100 (5 단위), 화면에는 배율(값/50)로 표시: 50 = 1.0, 55 = 1.1, 5 = 0.1, 100 = 2.0
+///    [ ] 키로 한 단계(5 = 0.1배)씩 조절 (MouseSensitivityApplier)
 /// </summary>
 public static class GameSettings
 {
@@ -17,6 +19,9 @@ public static class GameSettings
     public const float DefaultSfx = 90f;
     public const float DefaultSensitivity = 50f;
     public const bool DefaultFullscreen = true;
+    public const float MinSensitivity = 5f;      // 0.1배
+    public const float MaxSensitivity = 100f;    // 2.0배
+    public const float SensitivityStep = 5f;     // 0.1배
 
     const string KeyMaster = "set_master";
     const string KeyMusic = "set_music";
@@ -36,6 +41,16 @@ public static class GameSettings
 
     /// <summary>50 = 1배. 마우스 회전 속도에 곱하는 값</summary>
     public static float SensitivityMultiplier => Mathf.Max(0.02f, Sensitivity / 50f);
+
+    /// <summary>화면 표시용 배율 (예: "1.0")</summary>
+    public static string SensitivityDisplay => ToSensitivityDisplay(Sensitivity);
+
+    /// <summary>내부 값(5~100) → 표시 배율 문자열</summary>
+    public static string ToSensitivityDisplay(float value) => (value / 50f).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>5 단위로 맞춘 감도 값 (슬라이더 스냅용)</summary>
+    public static float SnapSensitivity(float v) =>
+        Mathf.Clamp(Mathf.Round(v / SensitivityStep) * SensitivityStep, MinSensitivity, MaxSensitivity);
 
     /// <summary>값이 바뀔 때마다 호출 (UI 갱신, 감도 적용 등)</summary>
     public static event Action Changed;
@@ -57,7 +72,7 @@ public static class GameSettings
         Master = PlayerPrefs.GetFloat(KeyMaster, DefaultMaster);
         Music = PlayerPrefs.GetFloat(KeyMusic, DefaultMusic);
         Sfx = PlayerPrefs.GetFloat(KeySfx, DefaultSfx);
-        Sensitivity = PlayerPrefs.GetFloat(KeySens, DefaultSensitivity);
+        Sensitivity = SnapSensitivity(PlayerPrefs.GetFloat(KeySens, DefaultSensitivity));
         Fullscreen = PlayerPrefs.GetInt(KeyFull, DefaultFullscreen ? 1 : 0) == 1;
         loaded = true;
     }
@@ -72,7 +87,22 @@ public static class GameSettings
     public static void SetMaster(float v) { EnsureLoaded(); Master = Mathf.Clamp(v, 0f, 100f); PlayerPrefs.SetFloat(KeyMaster, Master); ApplyAudio(); Notify(); }
     public static void SetMusic(float v) { EnsureLoaded(); Music = Mathf.Clamp(v, 0f, 100f); PlayerPrefs.SetFloat(KeyMusic, Music); ApplyAudio(); Notify(); }
     public static void SetSfx(float v) { EnsureLoaded(); Sfx = Mathf.Clamp(v, 0f, 100f); PlayerPrefs.SetFloat(KeySfx, Sfx); ApplyAudio(); Notify(); }
-    public static void SetSensitivity(float v) { EnsureLoaded(); Sensitivity = Mathf.Clamp(v, 1f, 100f); PlayerPrefs.SetFloat(KeySens, Sensitivity); Notify(); }
+    public static void SetSensitivity(float v)
+    {
+        EnsureLoaded();
+        float nv = SnapSensitivity(v);
+        if (Mathf.Approximately(nv, Sensitivity)) return;
+        Sensitivity = nv;
+        PlayerPrefs.SetFloat(KeySens, Sensitivity);
+        Notify();
+    }
+
+    /// <summary>감도를 한 단계(0.1배) 올리거나 내림. dir: +1 / -1</summary>
+    public static void StepSensitivity(int dir)
+    {
+        EnsureLoaded();
+        SetSensitivity(SnapSensitivity(Sensitivity) + Mathf.Sign(dir) * SensitivityStep);
+    }
 
     public static void SetFullscreen(bool on)
     {

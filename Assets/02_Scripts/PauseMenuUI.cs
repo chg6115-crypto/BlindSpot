@@ -231,7 +231,7 @@ public class PauseMenuUI : MonoBehaviour
         v = SliderRow(new Rect(x, y, w, 70), "SFX", GameSettings.Sfx, 0f, 100f);
         if (!Mathf.Approximately(v, GameSettings.Sfx)) GameSettings.SetSfx(v);
         y += 85;
-        v = SliderRow(new Rect(x, y, w, 70), "SENSITIVITY", GameSettings.Sensitivity, 1f, 100f);
+        v = SliderRow(new Rect(x, y, w, 70), "SENSITIVITY", GameSettings.Sensitivity, GameSettings.MinSensitivity, GameSettings.MaxSensitivity, true);
         if (!Mathf.Approximately(v, GameSettings.Sensitivity)) GameSettings.SetSensitivity(v);
         y += 95;
 
@@ -251,7 +251,8 @@ public class PauseMenuUI : MonoBehaviour
     }
 
     /// <summary>이름 + 슬라이더 + 숫자 한 줄. 정수로 반올림한 값 반환</summary>
-    private float SliderRow(Rect r, string label, float value, float min, float max)
+    /// <param name="sensitivity">감도 슬라이더: 5 단위 스냅 + 배율(1.0) 표시</param>
+    private float SliderRow(Rect r, string label, float value, float min, float max, bool sensitivity = false)
     {
         Label(new Rect(r.x, r.y, 330, r.height), label, sLabel, textColor, TextAnchor.MiddleLeft);
 
@@ -265,7 +266,9 @@ public class PauseMenuUI : MonoBehaviour
         var hit = new Rect(track.x, r.center.y - 22, track.width, 44);
         float nv = GUI.HorizontalSlider(hit, value, min, max, sSliderBg, sThumb);
 
-        Label(new Rect(r.xMax - 100, r.y, 100, r.height), Mathf.RoundToInt(nv).ToString(), sValue, accent, TextAnchor.MiddleRight);
+        if (sensitivity) nv = GameSettings.SnapSensitivity(nv);
+        string shown = sensitivity ? GameSettings.ToSensitivityDisplay(nv) : Mathf.RoundToInt(nv).ToString();
+        Label(new Rect(r.xMax - 100, r.y, 100, r.height), shown, sValue, accent, TextAnchor.MiddleRight);
         return Mathf.Round(nv);
     }
 

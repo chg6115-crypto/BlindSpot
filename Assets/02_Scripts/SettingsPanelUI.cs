@@ -32,7 +32,7 @@ public class SettingsPanelUI : MonoBehaviour
         Setup(masterSlider, 0f, 100f, v => GameSettings.SetMaster(v));
         Setup(musicSlider, 0f, 100f, v => GameSettings.SetMusic(v));
         Setup(sfxSlider, 0f, 100f, v => GameSettings.SetSfx(v));
-        Setup(sensitivitySlider, 1f, 100f, v => GameSettings.SetSensitivity(v));
+        Setup(sensitivitySlider, GameSettings.MinSensitivity, GameSettings.MaxSensitivity, v => GameSettings.SetSensitivity(v));
 
         if (fullscreenToggle != null)
             fullscreenToggle.onValueChanged.AddListener(on => { if (!refreshing) GameSettings.SetFullscreen(on); });
@@ -58,6 +58,13 @@ public class SettingsPanelUI : MonoBehaviour
         s.maxValue = max;
         s.wholeNumbers = true;
         s.onValueChanged.AddListener(v => { if (!refreshing) onChange(v); });
+        if (s == sensitivitySlider)   // 감도: 5 단위로 스냅 (슬라이더 손잡이도 맞춰 이동)
+            s.onValueChanged.AddListener(v =>
+            {
+                if (refreshing) return;
+                float snapped = GameSettings.SnapSensitivity(v);
+                if (!Mathf.Approximately(snapped, v)) s.SetValueWithoutNotify(snapped);
+            });
     }
 
     /// <summary>저장된 값으로 UI 갱신</summary>
@@ -68,6 +75,7 @@ public class SettingsPanelUI : MonoBehaviour
         Set(musicSlider, musicValue, GameSettings.Music);
         Set(sfxSlider, sfxValue, GameSettings.Sfx);
         Set(sensitivitySlider, sensitivityValue, GameSettings.Sensitivity);
+        if (sensitivityValue != null) sensitivityValue.text = GameSettings.SensitivityDisplay;   // 배율로 표시 (1.0)
         if (fullscreenToggle != null) fullscreenToggle.isOn = GameSettings.Fullscreen;
         refreshing = false;
     }

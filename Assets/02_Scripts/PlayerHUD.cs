@@ -8,6 +8,7 @@ using UnityEngine.UI;
 ///  - 우측 하단: 탄약 숫자 (남은 탄 / 탄창, 재장전 중엔 흐리게 깜빡임)
 ///               소나 아이콘(HUD_Sonar_UI) — 쿨타임 동안 시계방향으로 차오르고, 준비되면 밝게 + 아래 Q
 ///  - 죽었을 때(관전 중)는 숨김
+///  - 감도가 바뀌면 ([ ] 키 등) 화면 위쪽 가운데에 "SENSITIVITY 1.1"을 잠깐 표시
 /// 캔버스와 UI는 실행 시 코드로 만듦 (프리팹 필요 없음).
 /// 이미지를 비워두면 기본 도형(막대 / 원형 링)으로 그림.
 /// </summary>
@@ -42,6 +43,13 @@ public class PlayerHUD : MonoBehaviour
     [SerializeField] private float keyLabelSize = 16f;
     [SerializeField] private float ammoFontSize = 40f;
 
+    [Header("감도 변경 표시 (위쪽 가운데)")]
+    [SerializeField] private float toastFontSize = 22f;
+    [Tooltip("위쪽 가장자리에서 떨어진 거리 (px)")]
+    [SerializeField] private float toastTop = 120f;
+    [SerializeField] private float toastHold = 1.5f;
+    [SerializeField] private float toastFade = 0.5f;
+
     private Health health;
     private WeaponSwitcher switcher;
     private SonarSkill sonar;
@@ -52,6 +60,9 @@ public class PlayerHUD : MonoBehaviour
     private TextMeshProUGUI ammoText;
     private Image sonarFill, sonarBack;
     private TextMeshProUGUI sonarKey;
+    private TextMeshProUGUI toastText;
+    private float toastUntil = -1f;
+    private float lastSensitivity = -1f;
 
     private float hitFlash;
     private float sonarTotal = 1f;
@@ -74,11 +85,14 @@ public class PlayerHUD : MonoBehaviour
     private void OnEnable()
     {
         if (health != null) health.OnDamaged += HandleDamaged;
+        GameSettings.Changed += HandleSettingsChanged;
+        lastSensitivity = GameSettings.Sensitivity;
     }
 
     private void OnDisable()
     {
         if (health != null) health.OnDamaged -= HandleDamaged;
+        GameSettings.Changed -= HandleSettingsChanged;
         if (canvas != null) canvas.enabled = false;
     }
 
@@ -88,6 +102,16 @@ public class PlayerHUD : MonoBehaviour
     }
 
     private void HandleDamaged(Health h, float amount, GameObject attacker) => hitFlash = 1f;
+
+    /// <summary>감도 값이 실제로 바뀌었을 때만 표시 (볼륨 등 다른 설정 변경은 무시)</summary>
+    private void HandleSettingsChanged()
+    {
+        float s = GameSettings.Sensitivity;
+        if (Mathf.Approximately(s, lastSensitivity)) return;
+        lastSensitivity = s;
+        if (toastText != null) toastText.text = "SENSITIVITY " + GameSettings.SensitivityDisplay;
+        toastUntil = Time.unscaledTime + toastHold + toastFade;
+    }
 
     private void Build()
     {
@@ -142,6 +166,12 @@ public class PlayerHUD : MonoBehaviour
         sonarKey = MakeText(t, "SonarKey", "Q", keyLabelSize, TextAlignmentOptions.Bottom, BottomRight,
                             new Vector2(-margin.x, margin.y), new Vector2(sonarSize, keyH));
 
+        // ── 위쪽 가운데: 감도 변경 표시 ──
+        toastText = MakeText(t, "SensitivityToast", "", toastFontSize, TextAlignmentOptions.Top, new Vector2(0.5f, 1f),
+                             new Vector2(0f, -toastTop), new Vector2(600f, toastFontSize + 10f));
+        toastText.text = "SENSITIVITY " + GameSettings.SensitivityDisplay;
+        toastText.alpha = 0f;
+
         // ── 우측 하단: 탄약 (소나 왼쪽) ──
         float ammoRight = margin.x + sonarSize + 24f;
         ammoText = MakeText(t, "Ammo", "", ammoFontSize, TextAlignmentOptions.BottomRight, BottomRight,
@@ -181,6 +211,10 @@ public class PlayerHUD : MonoBehaviour
         hpFill.color = hc;
         if (hpFrame != null) hpFrame.color = hc;
         hpLabel.color = hc;
+
+        // 감도 변경 표시 (유지 후 서서히 사라짐)
+        float left = toastUntil - Time.unscaledTime;
+        toastText.alpha = left <= 0f ? 0f : Mathf.Clamp01(left / Mathf.Max(0.01f, toastFade));
 
         // 탄약
         var gun = switcher != null ? switcher.Current : null;
